@@ -1,0 +1,8 @@
+using System.Numerics;
+
+namespace Vergeo2D.Mesh;
+
+public interface IMeshDeformer2D
+{
+    Vector2[] Deform(Mesh2D mesh);
+}

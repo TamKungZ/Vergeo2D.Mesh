@@ -1,15 +1,11 @@
-<p align="center">
-  <img src="http://static.tamkungz.me/assets-image/vergeo2d/Vergeo2D-Icon.svg" width="120" alt="Vergeo2D logo">
-</p>
+# Vergeo2D.Mesh
 
-<h1 align="center">Vergeo2D.Mesh</h1>
+![Vergeo2D logo](http://static.tamkungz.me/assets-image/vergeo2d/Vergeo2D-Icon.svg)
 
-<p align="center">
-  <a href="https://www.nuget.org/packages/Vergeo2D.Mesh"><img src="https://img.shields.io/nuget/v/Vergeo2D.Mesh.svg" alt="NuGet"></a>
-  <a href="https://www.nuget.org/packages/Vergeo2D.Mesh"><img src="https://img.shields.io/nuget/dt/Vergeo2D.Mesh.svg" alt="NuGet downloads"></a>
-  <a href="https://github.com/TamKungZ/Vergeo2D.Mesh/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/.NET-8.0-512BD4" alt=".NET 8.0">
-</p>
+[![NuGet](https://img.shields.io/nuget/v/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)
+[![Downloads](https://img.shields.io/nuget/dt/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)
+![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TamKungZ/Vergeo2D.Mesh/blob/main/LICENSE)
 
 A lightweight C# library for editing 2D texture meshes — vertices, edges, faces and UV mapping — built as a foundation for 2D rigging tools.
 

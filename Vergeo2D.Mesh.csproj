@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Vergeo2D.Mesh</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>TamKungZ_</Authors>
+    <Product>Vergeo2D.Mesh</Product>
+    <Description>2D mesh library with vertex, edge and face structures, texture/UV binding, and an optional deformer extension point, for editing textured 2D meshes as a base for 2D rigging tools.</Description>
+    <PackageTags>2d;mesh;texture;uv;vertex;edge;face;rig;mesh-editor;deformer</PackageTags>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+    <None Include="LICENSE" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

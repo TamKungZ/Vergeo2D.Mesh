@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36518.9 d17.14
+VisualStudioVersion = 17.14.36518.9
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vergeo2D.Mesh", "Vergeo2D.Mesh.csproj", "{F92113E6-9E1E-7B23-9011-C5165ACF85ED}"
 EndProject
@@ -9,6 +9,7 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
+		Description = 2D mesh library with vertex, edge and face structures, texture/UV binding, and an optional deformer extension point, for editing textured 2D meshes as a base for 2D rigging tools.
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{F92113E6-9E1E-7B23-9011-C5165ACF85ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU

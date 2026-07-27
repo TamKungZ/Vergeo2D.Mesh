@@ -1,6 +1,6 @@
 # Vergeo2D.Mesh
 
-![Vergeo2D logo](http://static.tamkungz.me/assets-image/vergeo2d/Vergeo2D-Icon.svg)
+![Vergeo2D logo](https://raw.githubusercontent.com/TamKungZ/Vergeo2D.Mesh/refs/heads/master/assets/icon.png)
 
 [![NuGet](https://img.shields.io/nuget/v/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)
 [![Downloads](https://img.shields.io/nuget/dt/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)

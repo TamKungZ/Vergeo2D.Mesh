@@ -5,9 +5,11 @@
 [![NuGet](https://img.shields.io/nuget/v/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)
 [![Downloads](https://img.shields.io/nuget/dt/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)
 ![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TamKungZ/Vergeo2D.Mesh/blob/main/LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 A lightweight C# library for editing 2D texture meshes — vertices, edges, faces and UV mapping — built as a foundation for 2D rigging tools.
+
+> This library was originally created for my own projects, but if you find it useful, feel free to use it in yours as well.
 
 ## Install
 
@@ -62,13 +64,6 @@ var loaded = Mesh2DSerializer.FromJson(json);
 | `Texture2D` | Image dimensions plus pixel/UV conversion |
 | `IMeshDeformer2D`, `VertexOffsetDeformer2D` | Optional deformation extension point |
 | `Mesh2DSerializer` | JSON import/export |
-
-## Publishing
-
-```
-dotnet pack -c Release
-dotnet nuget push bin/Release/Vergeo2D.Mesh.1.0.0.nupkg --api-key <API_KEY> --source https://api.nuget.org/v3/index.json
-```
 
 ## Contributing
 

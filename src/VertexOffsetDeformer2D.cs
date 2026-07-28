@@ -29,13 +29,18 @@ public sealed class VertexOffsetDeformer2D : IMeshDeformer2D
     public Vector2[] Deform(Mesh2D mesh)
     {
         var result = new Vector2[mesh.Vertices.Count];
-
-        for (var i = 0; i < mesh.Vertices.Count; i++)
-        {
-            var vertex = mesh.Vertices[i];
-            result[i] = _offsets.TryGetValue(vertex.Index, out var offset) ? vertex.Position + offset : vertex.Position;
-        }
-
+        DeformInto(mesh, result);
         return result;
     }
+
+    public void DeformInto(Mesh2D mesh, Span<Vector2> destination)
+    {
+        var vertices = mesh.Vertices;
+        for (var i = 0; i < vertices.Count; i++)
+        {
+            var vertex = vertices[i];
+            destination[i] = _offsets.TryGetValue(vertex.Index, out var offset) ? vertex.Position + offset : vertex.Position;
+        }
+    }
 }
+

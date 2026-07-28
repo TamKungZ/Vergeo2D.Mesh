@@ -29,3 +29,4 @@ public readonly struct Edge2D : IEquatable<Edge2D>
 
     public static bool operator !=(Edge2D left, Edge2D right) => !left.Equals(right);
 }
+

@@ -22,3 +22,4 @@ public readonly struct Face2D
         yield return new Edge2D(C, A);
     }
 }
+

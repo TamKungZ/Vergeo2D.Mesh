@@ -9,6 +9,10 @@ public sealed class Mesh2D
     public List<Face2D> Faces { get; } = new();
     public Texture2D? Texture { get; private set; }
 
+    public int Version { get; private set; }
+
+    public void TouchGeometry() => Version++;
+
     public void SetTexture(Texture2D? texture)
     {
         Texture = texture;
@@ -23,12 +27,15 @@ public sealed class Mesh2D
             var uv = Texture.PixelToUV(vertex.Position);
             vertex.UV = flipY ? new Vector2(uv.X, 1f - uv.Y) : uv;
         }
+
+        TouchGeometry();
     }
 
     public int AddVertex(Vector2 position, Vector2 uv = default)
     {
         var vertex = new Vertex2D(Vertices.Count, position) { UV = uv };
         Vertices.Add(vertex);
+        TouchGeometry();
         return vertex.Index;
     }
 
@@ -37,6 +44,7 @@ public sealed class Mesh2D
         var face = new Face2D(a, b, c);
         Faces.Add(face);
         foreach (var edge in face.GetEdges()) Edges.Add(edge);
+        TouchGeometry();
     }
 
     public void RemoveVertex(int index)
@@ -58,6 +66,7 @@ public sealed class Mesh2D
         Faces.Clear();
         Faces.AddRange(remainingFaces);
         RebuildEdges();
+        TouchGeometry();
     }
 
     public void RebuildEdges()
@@ -72,6 +81,7 @@ public sealed class Mesh2D
     {
         Faces.RemoveAt(faceIndex);
         RebuildEdges();
+        TouchGeometry();
     }
 
     public IEnumerable<int> GetConnectedVertices(int vertexIndex)
@@ -156,3 +166,4 @@ public sealed class Mesh2D
         return clone;
     }
 }
+

@@ -15,3 +15,4 @@ public sealed class Vertex2D
         UV = uv;
     }
 }
+

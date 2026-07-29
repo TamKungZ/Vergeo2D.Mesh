@@ -69,6 +69,7 @@ internal sealed class MeshPreviewRenderer : IDisposable
 
     private unsafe void UploadVertices(float[] vertices)
     {
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
         fixed (float* pointer = vertices)
         {
             _gl.BufferData(

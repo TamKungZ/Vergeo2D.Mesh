@@ -34,13 +34,14 @@ internal sealed class MeshTestWindow : IDisposable
     private GL? _gl;
     private uint _vao;
     private uint _vbo;
-    private uint _ebo;
     private uint _texture;
     private uint _shader;
-    private int _indexCount;
+    private int _drawVertexCount;
     private int _viewportUniform;
-    private int _offsetUniform;
-    private Vector2 _contentSize;
+    private int _imageOriginUniform;
+    private int _imageScaleUniform;
+    private Vector2 _imageSize;
+    private bool _reportedDrawError;
 
     public MeshTestWindow(WindowOptions options, string imagePath)
     {
@@ -63,43 +64,41 @@ internal sealed class MeshTestWindow : IDisposable
         var gl = _gl;
 
         gl.ClearColor(0.08f, 0.09f, 0.1f, 1f);
+        gl.Disable(EnableCap.CullFace);
+        gl.Disable(EnableCap.DepthTest);
+        gl.Disable(EnableCap.ScissorTest);
+        gl.Disable(EnableCap.StencilTest);
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
         var textureInfo = Texture2D.LoadFromFile(_imagePath);
         var mesh = CreateImageMesh(textureInfo);
         MeshRenderExtractor.Extract(mesh, deformer: null, _renderData);
+        Console.WriteLine($"Loaded {_imagePath}");
+        Console.WriteLine($"Texture: {textureInfo.Width}x{textureInfo.Height}");
+        Console.WriteLine($"Render data: {_renderData.VertexCount} vertices, {_renderData.IndexCount} indices");
 
-        _contentSize = new Vector2(textureInfo.Width, textureInfo.Height);
-        _indexCount = _renderData.IndexCount;
+        _imageSize = new Vector2(textureInfo.Width, textureInfo.Height);
         _shader = CreateShaderProgram(gl);
         _viewportUniform = gl.GetUniformLocation(_shader, "uViewport");
-        _offsetUniform = gl.GetUniformLocation(_shader, "uOffset");
+        _imageOriginUniform = gl.GetUniformLocation(_shader, "uImageOrigin");
+        _imageScaleUniform = gl.GetUniformLocation(_shader, "uImageScale");
         _texture = LoadTexture(gl, _imagePath);
 
         _vao = gl.GenVertexArray();
         _vbo = gl.GenBuffer();
-        _ebo = gl.GenBuffer();
 
         gl.BindVertexArray(_vao);
 
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-        fixed (float* vertices = _renderData.Vertices)
+        var vertices = ExpandIndexedTriangles(_renderData);
+        _drawVertexCount = vertices.Length / MeshRenderData2D.FloatsPerVertex;
+        fixed (float* vertexPointer = vertices)
         {
             gl.BufferData(
                 BufferTargetARB.ArrayBuffer,
-                (nuint)(_renderData.Vertices.Length * sizeof(float)),
-                vertices,
-                BufferUsageARB.StaticDraw);
-        }
-
-        gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
-        fixed (int* indices = _renderData.Indices)
-        {
-            gl.BufferData(
-                BufferTargetARB.ElementArrayBuffer,
-                (nuint)(_renderData.Indices.Length * sizeof(int)),
-                indices,
+                (nuint)(vertices.Length * sizeof(float)),
+                vertexPointer,
                 BufferUsageARB.StaticDraw);
         }
 
@@ -110,29 +109,34 @@ internal sealed class MeshTestWindow : IDisposable
         gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride, (void*)(2 * sizeof(float)));
 
         gl.BindVertexArray(0);
+        CheckGl(gl, "create mesh buffers");
         OnResize(_window.FramebufferSize);
     }
 
     private unsafe void OnRender(double deltaSeconds)
     {
         var gl = _gl!;
+        var viewport = _window.FramebufferSize;
+        if (viewport.X <= 0 || viewport.Y <= 0) return;
+
+        gl.Viewport(viewport);
         gl.Clear(ClearBufferMask.ColorBufferBit);
         gl.UseProgram(_shader);
-
-        var viewport = _window.FramebufferSize;
-        var scale = MathF.Min(
-            MathF.Min(viewport.X / _contentSize.X, viewport.Y / _contentSize.Y),
-            1f);
-        var drawSize = _contentSize * scale;
-        var offset = new Vector2((viewport.X - drawSize.X) * 0.5f, (viewport.Y - drawSize.Y) * 0.5f);
-
-        gl.Uniform2(_viewportUniform, viewport.X, viewport.Y);
-        gl.Uniform3(_offsetUniform, offset.X, offset.Y, scale);
+        var imageScale = MathF.Min(viewport.X / _imageSize.X, viewport.Y / _imageSize.Y);
+        var scaledImageSize = _imageSize * imageScale;
+        var imageOrigin = new Vector2(
+            MathF.Round((viewport.X - scaledImageSize.X) * 0.5f),
+            MathF.Round((viewport.Y - scaledImageSize.Y) * 0.5f));
+        gl.Uniform2(_viewportUniform, (float)viewport.X, (float)viewport.Y);
+        gl.Uniform2(_imageOriginUniform, imageOrigin.X, imageOrigin.Y);
+        gl.Uniform1(_imageScaleUniform, imageScale);
 
         gl.ActiveTexture(TextureUnit.Texture0);
         gl.BindTexture(TextureTarget.Texture2D, _texture);
         gl.BindVertexArray(_vao);
-        gl.DrawElements(PrimitiveType.Triangles, (uint)_indexCount, DrawElementsType.UnsignedInt, null);
+        gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)_drawVertexCount);
+        if (!_reportedDrawError)
+            _reportedDrawError = !CheckGl(gl, "draw frame");
     }
 
     private void OnResize(Vector2D<int> size)
@@ -155,6 +159,26 @@ internal sealed class MeshTestWindow : IDisposable
         return mesh;
     }
 
+    private static float[] ExpandIndexedTriangles(MeshRenderData2D renderData)
+    {
+        var sourceVertices = renderData.Vertices;
+        var sourceIndices = renderData.Indices;
+        var expanded = new float[sourceIndices.Length * MeshRenderData2D.FloatsPerVertex];
+
+        for (var i = 0; i < sourceIndices.Length; i++)
+        {
+            var sourceOffset = sourceIndices[i] * MeshRenderData2D.FloatsPerVertex;
+            var targetOffset = i * MeshRenderData2D.FloatsPerVertex;
+
+            expanded[targetOffset] = sourceVertices[sourceOffset];
+            expanded[targetOffset + 1] = sourceVertices[sourceOffset + 1];
+            expanded[targetOffset + 2] = sourceVertices[sourceOffset + 2];
+            expanded[targetOffset + 3] = sourceVertices[sourceOffset + 3];
+        }
+
+        return expanded;
+    }
+
     private static unsafe uint LoadTexture(GL gl, string path)
     {
         using var stream = File.OpenRead(path);
@@ -166,6 +190,7 @@ internal sealed class MeshTestWindow : IDisposable
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
         gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+        gl.PixelStore(PixelStoreParameter.UnpackAlignment, 1);
 
         fixed (byte* pixels = image.Data)
         {
@@ -192,21 +217,25 @@ internal sealed class MeshTestWindow : IDisposable
             layout (location = 1) in vec2 aUv;
 
             uniform vec2 uViewport;
-            uniform vec3 uOffset;
+            uniform vec2 uImageOrigin;
+            uniform float uImageScale;
 
+            out vec2 vImagePixel;
             out vec2 vUv;
 
             void main()
             {
-                vec2 pixel = (aPosition * uOffset.z) + uOffset.xy;
-                vec2 ndc = vec2((pixel.x / uViewport.x) * 2.0 - 1.0, 1.0 - (pixel.y / uViewport.y) * 2.0);
+                vec2 screenPixel = (aPosition * uImageScale) + uImageOrigin;
+                vec2 ndc = vec2((screenPixel.x / uViewport.x) * 2.0 - 1.0, 1.0 - (screenPixel.y / uViewport.y) * 2.0);
                 gl_Position = vec4(ndc, 0.0, 1.0);
-                vUv = vec2(aUv.x, 1.0 - aUv.y);
+                vImagePixel = aPosition * uImageScale;
+                vUv = aUv;
             }
             """);
 
         var fragmentShader = CompileShader(gl, ShaderType.FragmentShader, """
             #version 330 core
+            in vec2 vImagePixel;
             in vec2 vUv;
             out vec4 FragColor;
 
@@ -214,13 +243,18 @@ internal sealed class MeshTestWindow : IDisposable
 
             void main()
             {
-                FragColor = texture(uTexture, vUv);
+                vec4 color = texture(uTexture, vUv);
+                float square = 16.0;
+                float checkerIndex = mod(floor(vImagePixel.x / square) + floor(vImagePixel.y / square), 2.0);
+                vec3 checker = mix(vec3(0.70), vec3(0.90), checkerIndex);
+                FragColor = vec4(mix(checker, color.rgb, color.a), 1.0);
             }
             """);
 
         var program = gl.CreateProgram();
         gl.AttachShader(program, vertexShader);
         gl.AttachShader(program, fragmentShader);
+        gl.BindFragDataLocation(program, 0, "FragColor");
         gl.LinkProgram(program);
 
         gl.GetProgram(program, ProgramPropertyARB.LinkStatus, out var status);
@@ -231,6 +265,18 @@ internal sealed class MeshTestWindow : IDisposable
         gl.UseProgram(program);
         gl.Uniform1(gl.GetUniformLocation(program, "uTexture"), 0);
         return program;
+    }
+
+    private static bool CheckGl(GL gl, string stage)
+    {
+        var error = gl.GetError();
+        if (error != GLEnum.NoError)
+        {
+            Console.Error.WriteLine($"OpenGL error after {stage}: {error}");
+            return false;
+        }
+
+        return true;
     }
 
     private static uint CompileShader(GL gl, ShaderType type, string source)
@@ -250,7 +296,6 @@ internal sealed class MeshTestWindow : IDisposable
         if (_gl is null) return;
 
         _gl.DeleteBuffer(_vbo);
-        _gl.DeleteBuffer(_ebo);
         _gl.DeleteVertexArray(_vao);
         _gl.DeleteTexture(_texture);
         _gl.DeleteProgram(_shader);

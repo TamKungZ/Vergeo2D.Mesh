@@ -4,6 +4,9 @@ using Vergeo2D.Rendering;
 
 internal sealed class UvOverlayRenderer
 {
+    private const int CoverageSteps = 4;
+    private const float MinimumOpaqueCoverage = 0.22f;
+
     private static readonly Vector4 FaceColor = new(0.15f, 0.55f, 1f, 0.18f);
     private static readonly Vector4 EdgeColor = new(0.05f, 0.45f, 1f, 0.95f);
     private static readonly Vector4 VertexColor = new(1f, 0.25f, 0.15f, 1f);
@@ -31,7 +34,7 @@ internal sealed class UvOverlayRenderer
             var a = ReadVertex(sourceVertices, sourceIndices[i]);
             var b = ReadVertex(sourceVertices, sourceIndices[i + 1]);
             var c = ReadVertex(sourceVertices, sourceIndices[i + 2]);
-            if (!TouchesOpaqueTexture(a.Uv, b.Uv, c.Uv)) continue;
+            if (!HasVisibleCoverage(a.Uv, b.Uv, c.Uv)) continue;
 
             AddScreenPoint(faceVertices, a.Position, imageOrigin, imageScale);
             AddScreenPoint(faceVertices, b.Position, imageOrigin, imageScale);
@@ -58,21 +61,25 @@ internal sealed class UvOverlayRenderer
         solid.DrawPoints(pointVertices.ToArray(), VertexColor);
     }
 
-    private bool TouchesOpaqueTexture(Vector2 a, Vector2 b, Vector2 c)
+    private bool HasVisibleCoverage(Vector2 a, Vector2 b, Vector2 c)
     {
-        var center = (a + b + c) / 3f;
-        var ab = (a + b) * 0.5f;
-        var bc = (b + c) * 0.5f;
-        var ca = (c + a) * 0.5f;
+        var samples = 0;
+        var opaqueSamples = 0;
 
-        return
-            IsOpaqueUv(a) ||
-            IsOpaqueUv(b) ||
-            IsOpaqueUv(c) ||
-            IsOpaqueUv(center) ||
-            IsOpaqueUv(ab) ||
-            IsOpaqueUv(bc) ||
-            IsOpaqueUv(ca);
+        for (var y = 0; y <= CoverageSteps; y++)
+        {
+            for (var x = 0; x <= CoverageSteps - y; x++)
+            {
+                var u = x / (float)CoverageSteps;
+                var v = y / (float)CoverageSteps;
+                var w = 1f - u - v;
+                var uv = a * w + b * u + c * v;
+                samples++;
+                if (IsOpaqueUv(uv)) opaqueSamples++;
+            }
+        }
+
+        return opaqueSamples / (float)samples >= MinimumOpaqueCoverage;
     }
 
     private bool IsOpaqueUv(Vector2 uv)

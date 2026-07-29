@@ -296,8 +296,8 @@ internal sealed class MeshTestWindow : IDisposable
         MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);
         _preview?.Dispose();
         _preview = new MeshPreviewRenderer(_gl, _imagePath, _renderData);
-        _uvOverlay = new UvOverlayRenderer(_renderData, _alphaMask, _imageSize);
-        Console.WriteLine($"Generated connected mesh: {_renderData.VertexCount} vertices, {_renderData.IndexCount / 3} faces, spacing {_generationSettings.Spacing}");
+        _uvOverlay = new UvOverlayRenderer(_renderData);
+        Console.WriteLine($"Generated shape mesh: {_renderData.VertexCount} vertices, {_renderData.IndexCount / 3} faces, spacing {_generationSettings.Spacing}");
     }
 
     private void BeginImageDrag(Vector2 screenPoint)
@@ -321,8 +321,7 @@ internal sealed class MeshTestWindow : IDisposable
         _renderData.Clear();
         MeshRenderExtractor.Extract(_mesh, _dragDeformer.HasDrag ? _dragDeformer : null, _renderData);
         _preview.Update(_renderData);
-        if (_alphaMask is not null)
-            _uvOverlay = new UvOverlayRenderer(_renderData, _alphaMask, _imageSize);
+        _uvOverlay = new UvOverlayRenderer(_renderData);
     }
 
     private void CommitDragToMesh()

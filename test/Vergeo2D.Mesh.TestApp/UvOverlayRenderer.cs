@@ -9,44 +9,96 @@ internal sealed class UvOverlayRenderer
     private static readonly Vector4 VertexColor = new(1f, 0.25f, 0.15f, 1f);
 
     private readonly MeshRenderData2D _renderData;
-    public UvOverlayRenderer(MeshRenderData2D renderData)
+    private readonly ImageAlphaMask _alphaMask;
+    private readonly Vector2 _imageSize;
+
+    public UvOverlayRenderer(MeshRenderData2D renderData, ImageAlphaMask alphaMask, Vector2 imageSize)
     {
         _renderData = renderData;
+        _alphaMask = alphaMask;
+        _imageSize = imageSize;
     }
 
     public void Draw(Solid2DRenderer solid, Vector2 imageOrigin, float imageScale)
     {
         var sourceVertices = _renderData.Vertices;
         var sourceIndices = _renderData.Indices;
-        var faceVertices = new float[sourceIndices.Length * 2];
-
-        for (var i = 0; i < sourceIndices.Length; i++)
-        {
-            var vertexOffset = sourceIndices[i] * MeshRenderData2D.FloatsPerVertex;
-            var position = new Vector2(sourceVertices[vertexOffset], sourceVertices[vertexOffset + 1]);
-            var screen = ImageToScreen(position, imageOrigin, imageScale);
-            var targetOffset = i * 2;
-            faceVertices[targetOffset] = screen.X;
-            faceVertices[targetOffset + 1] = screen.Y;
-        }
-
-        solid.DrawTriangles(faceVertices, FaceColor);
+        var faceVertices = new List<float>(sourceIndices.Length * 2);
+        var pointVertices = new List<float>(sourceIndices.Length * 2);
 
         for (var i = 0; i < sourceIndices.Length; i += 3)
         {
+            var a = ReadVertex(sourceVertices, sourceIndices[i]);
+            var b = ReadVertex(sourceVertices, sourceIndices[i + 1]);
+            var c = ReadVertex(sourceVertices, sourceIndices[i + 2]);
+            if (!TouchesOpaqueTexture(a.Uv, b.Uv, c.Uv)) continue;
+
+            AddScreenPoint(faceVertices, a.Position, imageOrigin, imageScale);
+            AddScreenPoint(faceVertices, b.Position, imageOrigin, imageScale);
+            AddScreenPoint(faceVertices, c.Position, imageOrigin, imageScale);
+        }
+
+        if (faceVertices.Count == 0) return;
+
+        solid.DrawTriangles(faceVertices.ToArray(), FaceColor);
+
+        var vertices = faceVertices.ToArray();
+        for (var i = 0; i < vertices.Length; i += 6)
+        {
             solid.DrawLineLoop(new[]
             {
-                faceVertices[i * 2], faceVertices[i * 2 + 1],
-                faceVertices[(i + 1) * 2], faceVertices[(i + 1) * 2 + 1],
-                faceVertices[(i + 2) * 2], faceVertices[(i + 2) * 2 + 1]
+                vertices[i], vertices[i + 1],
+                vertices[i + 2], vertices[i + 3],
+                vertices[i + 4], vertices[i + 5]
             }, EdgeColor);
         }
 
-        solid.DrawPoints(faceVertices, VertexColor);
+        for (var i = 0; i < vertices.Length; i++)
+            pointVertices.Add(vertices[i]);
+        solid.DrawPoints(pointVertices.ToArray(), VertexColor);
+    }
+
+    private bool TouchesOpaqueTexture(Vector2 a, Vector2 b, Vector2 c)
+    {
+        var center = (a + b + c) / 3f;
+        var ab = (a + b) * 0.5f;
+        var bc = (b + c) * 0.5f;
+        var ca = (c + a) * 0.5f;
+
+        return
+            IsOpaqueUv(a) ||
+            IsOpaqueUv(b) ||
+            IsOpaqueUv(c) ||
+            IsOpaqueUv(center) ||
+            IsOpaqueUv(ab) ||
+            IsOpaqueUv(bc) ||
+            IsOpaqueUv(ca);
+    }
+
+    private bool IsOpaqueUv(Vector2 uv)
+    {
+        return _alphaMask.IsOpaqueAt(uv.X * _imageSize.X, uv.Y * _imageSize.Y);
+    }
+
+    private static MeshOverlayVertex ReadVertex(ReadOnlySpan<float> sourceVertices, int index)
+    {
+        var offset = index * MeshRenderData2D.FloatsPerVertex;
+        return new MeshOverlayVertex(
+            new Vector2(sourceVertices[offset], sourceVertices[offset + 1]),
+            new Vector2(sourceVertices[offset + 2], sourceVertices[offset + 3]));
+    }
+
+    private static void AddScreenPoint(List<float> target, Vector2 position, Vector2 imageOrigin, float imageScale)
+    {
+        var screen = ImageToScreen(position, imageOrigin, imageScale);
+        target.Add(screen.X);
+        target.Add(screen.Y);
     }
 
     private static Vector2 ImageToScreen(Vector2 position, Vector2 imageOrigin, float imageScale)
     {
         return imageOrigin + position * imageScale;
     }
+
+    private readonly record struct MeshOverlayVertex(Vector2 Position, Vector2 Uv);
 }

@@ -290,21 +290,22 @@ internal sealed class MeshTestWindow : IDisposable
 
         _mesh = GridMeshGenerator.Generate(_textureInfo, _alphaMask, _generationSettings);
         _dragDeformer.Clear();
-        _dragDeformer.Radius = Math.Max(160f, _generationSettings.Spacing * 4f);
+        _dragDeformer.Radius = Math.Max(120f, _generationSettings.Spacing * 3f);
 
         _renderData.Clear();
         MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);
         _preview?.Dispose();
         _preview = new MeshPreviewRenderer(_gl, _imagePath, _renderData);
-        _uvOverlay = new UvOverlayRenderer(_renderData);
-        Console.WriteLine($"Generated shape mesh: {_renderData.VertexCount} vertices, {_renderData.IndexCount / 3} faces, spacing {_generationSettings.Spacing}");
+        _uvOverlay = new UvOverlayRenderer(_renderData, _alphaMask, _imageSize);
+        Console.WriteLine($"Generated connected mesh: {_renderData.VertexCount} vertices, {_renderData.IndexCount / 3} faces, spacing {_generationSettings.Spacing}");
     }
 
     private void BeginImageDrag(Vector2 screenPoint)
     {
-        if (_mesh is null || screenPoint.X < PanelWidth) return;
+        if (_mesh is null || _alphaMask is null || screenPoint.X < PanelWidth) return;
         var imagePoint = ScreenToImage(screenPoint);
         if (!IsInsideImage(imagePoint)) return;
+        if (!_alphaMask.IsOpaqueAt(imagePoint.X, imagePoint.Y)) return;
         if (_mesh.FindFaceAt(imagePoint) < 0) return;
 
         _dragOriginImage = imagePoint;
@@ -320,7 +321,8 @@ internal sealed class MeshTestWindow : IDisposable
         _renderData.Clear();
         MeshRenderExtractor.Extract(_mesh, _dragDeformer.HasDrag ? _dragDeformer : null, _renderData);
         _preview.Update(_renderData);
-        _uvOverlay = new UvOverlayRenderer(_renderData);
+        if (_alphaMask is not null)
+            _uvOverlay = new UvOverlayRenderer(_renderData, _alphaMask, _imageSize);
     }
 
     private void CommitDragToMesh()

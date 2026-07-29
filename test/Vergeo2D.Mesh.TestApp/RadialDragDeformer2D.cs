@@ -8,8 +8,6 @@ internal sealed class RadialDragDeformer2D : IMeshDeformer2D
 
     public float Radius { get; set; } = 180f;
 
-    public float StretchRadiusScale { get; set; } = 0.85f;
-
     public bool HasDrag { get; private set; }
 
     public void SetDrag(Vector2 origin, Vector2 offset)
@@ -43,8 +41,7 @@ internal sealed class RadialDragDeformer2D : IMeshDeformer2D
             return;
         }
 
-        var offsetLength = _offset.Length();
-        var radius = Math.Max(1f, Radius + offsetLength * StretchRadiusScale);
+        var radius = Math.Max(1f, Radius);
         for (var i = 0; i < vertices.Count; i++)
         {
             var position = vertices[i].Position;
@@ -57,7 +54,6 @@ internal sealed class RadialDragDeformer2D : IMeshDeformer2D
     private static float SmoothFalloff(float normalizedDistance)
     {
         var inverse = 1f - normalizedDistance;
-        var smooth = inverse * inverse * (3f - 2f * inverse);
-        return smooth * smooth;
+        return inverse * inverse * (3f - 2f * inverse);
     }
 }

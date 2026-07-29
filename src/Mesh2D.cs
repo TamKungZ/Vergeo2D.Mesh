@@ -33,7 +33,7 @@ public sealed class Mesh2D
 
     public int AddVertex(Vector2 position, Vector2 uv = default)
     {
-        var vertex = new Vertex2D(Vertices.Count, position) { UV = uv };
+        var vertex = new Vertex2D(Vertices.Count, position, uv, TouchGeometry);
         Vertices.Add(vertex);
         TouchGeometry();
         return vertex.Index;
@@ -41,6 +41,10 @@ public sealed class Mesh2D
 
     public void AddFace(int a, int b, int c)
     {
+        ValidateVertexIndex(a, nameof(a));
+        ValidateVertexIndex(b, nameof(b));
+        ValidateVertexIndex(c, nameof(c));
+
         var face = new Face2D(a, b, c);
         Faces.Add(face);
         foreach (var edge in face.GetEdges()) Edges.Add(edge);
@@ -138,6 +142,12 @@ public sealed class Mesh2D
 
     private static float Cross(Vector2 a, Vector2 b) => a.X * b.Y - a.Y * b.X;
 
+    private void ValidateVertexIndex(int index, string parameterName)
+    {
+        if ((uint)index >= (uint)Vertices.Count)
+            throw new ArgumentOutOfRangeException(parameterName, index, "Vertex index is outside the mesh vertex range.");
+    }
+
     public (Vector2 Min, Vector2 Max) GetBounds()
     {
         if (Vertices.Count == 0) return (Vector2.Zero, Vector2.Zero);
@@ -166,4 +176,3 @@ public sealed class Mesh2D
         return clone;
     }
 }
-

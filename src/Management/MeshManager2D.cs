@@ -10,6 +10,7 @@ public sealed class MeshManager2D
     private MeshRenderData2D?[] _renderData;
     private int[] _generations;
     private int[] _lastExtractedVersion;
+    private int[] _lastGeometryHash;
     private bool[] _alive;
     private bool[] _forceDirty;
 
@@ -24,6 +25,7 @@ public sealed class MeshManager2D
         _renderData = new MeshRenderData2D?[capacity];
         _generations = new int[capacity];
         _lastExtractedVersion = new int[capacity];
+        _lastGeometryHash = new int[capacity];
         _alive = new bool[capacity];
         _forceDirty = new bool[capacity];
     }
@@ -45,6 +47,7 @@ public sealed class MeshManager2D
         _deformers[index] = deformer;
         _renderData[index] ??= new MeshRenderData2D();
         _lastExtractedVersion[index] = int.MinValue;
+        _lastGeometryHash[index] = 0;
         _alive[index] = true;
         _forceDirty[index] = false;
         Count++;
@@ -204,7 +207,8 @@ public sealed class MeshManager2D
     private bool NeedsExtraction(int index) =>
         _forceDirty[index] ||
         _deformers[index] is not null ||
-        _lastExtractedVersion[index] != _meshes[index]!.Version;
+        _lastExtractedVersion[index] != _meshes[index]!.Version ||
+        _lastGeometryHash[index] != ComputeGeometryHash(_meshes[index]!);
 
     private void ExtractSlot(int index)
     {
@@ -215,7 +219,31 @@ public sealed class MeshManager2D
         MeshRenderExtractor.Extract(mesh, deformer, target);
 
         _lastExtractedVersion[index] = mesh.Version;
+        _lastGeometryHash[index] = ComputeGeometryHash(mesh);
         _forceDirty[index] = false;
+    }
+
+    private static int ComputeGeometryHash(Mesh2D mesh)
+    {
+        var hash = new HashCode();
+        hash.Add(mesh.Vertices.Count);
+        hash.Add(mesh.Faces.Count);
+
+        foreach (var vertex in mesh.Vertices)
+        {
+            hash.Add(vertex.Index);
+            hash.Add(vertex.Position);
+            hash.Add(vertex.UV);
+        }
+
+        foreach (var face in mesh.Faces)
+        {
+            hash.Add(face.A);
+            hash.Add(face.B);
+            hash.Add(face.C);
+        }
+
+        return hash.ToHashCode();
     }
 
     private int AllocateSlot()
@@ -234,6 +262,7 @@ public sealed class MeshManager2D
         Array.Resize(ref _renderData, newSize);
         Array.Resize(ref _generations, newSize);
         Array.Resize(ref _lastExtractedVersion, newSize);
+        Array.Resize(ref _lastGeometryHash, newSize);
         Array.Resize(ref _alive, newSize);
         Array.Resize(ref _forceDirty, newSize);
     }
@@ -243,4 +272,3 @@ public sealed class MeshManager2D
         if (!IsValid(handle)) throw new ArgumentException("Invalid or stale mesh handle.", nameof(handle));
     }
 }
-

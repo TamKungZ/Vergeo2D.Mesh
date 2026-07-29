@@ -297,7 +297,7 @@ internal sealed class MeshTestWindow : IDisposable
         _preview?.Dispose();
         _preview = new MeshPreviewRenderer(_gl, _imagePath, _renderData);
         _uvOverlay = new UvOverlayRenderer(_renderData);
-        Console.WriteLine($"Generated shape mesh: {_renderData.VertexCount} vertices, {_renderData.IndexCount / 3} faces, spacing {_generationSettings.Spacing}");
+        Console.WriteLine($"Generated connected mesh: {_renderData.VertexCount} vertices, {_renderData.IndexCount / 3} faces, spacing {_generationSettings.Spacing}");
     }
 
     private void BeginImageDrag(Vector2 screenPoint)

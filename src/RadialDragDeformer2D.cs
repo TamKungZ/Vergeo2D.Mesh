@@ -1,7 +1,8 @@
 using System.Numerics;
-using Vergeo2D.Mesh;
 
-internal sealed class RadialDragDeformer2D : IMeshDeformer2D
+namespace Vergeo2D.Mesh;
+
+public sealed class RadialDragDeformer2D : IMeshDeformer2D
 {
     private Vector2 _origin;
     private Vector2 _offset;
@@ -33,6 +34,10 @@ internal sealed class RadialDragDeformer2D : IMeshDeformer2D
 
     public void DeformInto(Mesh2D mesh, Span<Vector2> destination)
     {
+        if (mesh is null) throw new ArgumentNullException(nameof(mesh));
+        if (destination.Length < mesh.Vertices.Count)
+            throw new ArgumentException("Destination span is smaller than the mesh vertex count.", nameof(destination));
+
         var vertices = mesh.Vertices;
         if (!HasDrag)
         {
@@ -57,3 +62,4 @@ internal sealed class RadialDragDeformer2D : IMeshDeformer2D
         return inverse * inverse * (3f - 2f * inverse);
     }
 }
+

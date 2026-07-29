@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Numerics;
 
 namespace Vergeo2D.Mesh;
@@ -174,5 +175,25 @@ public sealed class Mesh2D
         foreach (var face in Faces) clone.AddFace(face.A, face.B, face.C);
 
         return clone;
+    }
+
+    public void ApplyDeformer(IMeshDeformer2D deformer)
+    {
+        if (deformer is null) throw new ArgumentNullException(nameof(deformer));
+        if (Vertices.Count == 0) return;
+
+        var pooled = ArrayPool<Vector2>.Shared.Rent(Vertices.Count);
+        try
+        {
+            var positions = pooled.AsSpan(0, Vertices.Count);
+            deformer.DeformInto(this, positions);
+
+            for (var i = 0; i < Vertices.Count; i++)
+                Vertices[i].Position = positions[i];
+        }
+        finally
+        {
+            ArrayPool<Vector2>.Shared.Return(pooled);
+        }
     }
 }

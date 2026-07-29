@@ -29,9 +29,10 @@ dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj -- 
 ## What It Tests
 
 - Loads image dimensions through `Texture2D.LoadFromFile`.
-- Generates a triangle mesh from the image alpha silhouette.
-- Uses a connected render mesh behind the preview so large drags do not tear the texture.
+- Adapts the image alpha channel to `IMeshMask2D`.
+- Generates a triangle mesh from the image alpha silhouette through `MeshGridGenerator2D.GenerateMaskedContourGrid`.
+- Uses `MeshGridGenerator2D.GenerateConnectedGrid` behind the preview so large drags do not tear the texture.
 - Generates UVs from mesh positions.
 - Extracts render buffers with `MeshRenderExtractor`.
 - Uploads the extracted vertices and indices to OpenGL and draws the texture in a window.
-- Uses an `IMeshDeformer2D` implementation to stretch the generated mesh with mouse drag input.
+- Uses `RadialDragDeformer2D` and `Mesh2D.ApplyDeformer` to stretch and commit the generated mesh with mouse drag input.

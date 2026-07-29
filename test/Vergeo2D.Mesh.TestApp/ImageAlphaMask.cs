@@ -1,6 +1,8 @@
 using StbImageSharp;
+using System.Numerics;
+using Vergeo2D.Mesh;
 
-internal sealed class ImageAlphaMask
+internal sealed class ImageAlphaMask : IMeshMask2D
 {
     private readonly byte[] _alpha;
 
@@ -32,4 +34,6 @@ internal sealed class ImageAlphaMask
         var iy = Math.Clamp((int)MathF.Round(y), 0, Height - 1);
         return _alpha[iy * Width + ix] > threshold;
     }
+
+    public bool Contains(Vector2 point) => IsOpaqueAt(point.X, point.Y);
 }

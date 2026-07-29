@@ -52,12 +52,35 @@ var json = Mesh2DSerializer.ToJson(mesh);
 var loaded = Mesh2DSerializer.FromJson(json);
 ```
 
+```csharp
+// Common mesh setup for textured sprites.
+var quad = MeshPrimitives2D.CreateTexturedQuad(texture);
+
+// Build a connected grid for deformation. Provide a mask when you want
+// diagonals to follow the visible shape while keeping the mesh connected.
+var mask = MeshMask2D.FromPredicate(point => alphaMask.IsOpaqueAt(point.X, point.Y));
+var grid = MeshGridGenerator2D.GenerateConnectedGrid(
+    texture,
+    new MeshGridOptions2D { Spacing = 64 },
+    mask);
+
+// Build a contour mesh for overlays, picking, or visualizing the masked shape.
+var contour = MeshGridGenerator2D.GenerateMaskedContourGrid(texture, mask);
+
+// Drag deformation with a smooth radial falloff.
+var drag = new RadialDragDeformer2D { Radius = 180f };
+drag.SetDrag(origin, offset);
+grid.ApplyDeformer(drag);
+```
+
 ## Features
 
 - Vertex / edge / face mesh structure — add, remove, clone, adjacency queries, point-in-face hit testing
 - Dependency-free PNG / JPEG / BMP / GIF dimension reader with pixel ↔ UV conversion
+- Textured quad and grid mesh generators for common sprite/deformation setup
+- Mask-driven contour mesh generation through `IMeshMask2D` / predicate adapters
 - JSON serialization, including the linked texture path
-- `IMeshDeformer2D` extension point for custom deformation logic — optional, ships with a minimal `VertexOffsetDeformer2D` reference implementation
+- `IMeshDeformer2D` extension point for custom deformation logic — ships with `VertexOffsetDeformer2D` and `RadialDragDeformer2D` reference implementations
 - Handle-based mesh manager for tracking large numbers of live meshes with generation-checked handles, dirty-only re-extraction, and texture batching
 - A pluggable rendering abstraction (`IMeshRenderBackend2D`) with optional OpenGL, Direct3D11, and Vulkan backends
 
@@ -99,6 +122,8 @@ manager.Remove(handle); // handle becomes invalid immediately, generation is bum
 |---|---|
 | `MeshRenderExtractor` | Converts a `Mesh2D` (+ optional deformer) into a `MeshRenderData2D`, applying deformation via a pooled scratch buffer |
 | `MeshRenderData2D` | Growable vertex (`x, y, u, v`) and index buffers with independent dirty flags for vertices/indices |
+| `MeshRenderData2DExtensions` | Helpers such as `ExpandIndexedTriangles()` for APIs that draw non-indexed triangle lists |
+| `MeshViewportLayout2D` | Fits mesh/image content into a viewport and converts between screen and content coordinates |
 | `IMeshRenderBackend2D` | Interface a graphics backend implements: create/update/destroy a GPU resource, bind a texture, draw with a `RenderTransform2D` |
 | `RenderTransform2D` | Position + rotation (radians) + scale, convertible to a `Matrix3x2` |
 | `RenderResourceHandle` | Generation-checked handle returned by a backend for a GPU-side resource |
@@ -136,12 +161,13 @@ Without the matching define constant, the backend class simply isn't compiled in
 | `Vertex2D` | Position + UV |
 | `Edge2D` | Undirected pair of vertex indices |
 | `Face2D` | Triangle of three vertex indices |
-| `Mesh2D` | Vertex/edge/face collection with editing and query methods; exposes a `Version` counter (bumped via `TouchGeometry()`) used for dirty tracking |
+| `Mesh2D` | Vertex/edge/face collection with editing and query methods; exposes a `Version` counter (bumped via `TouchGeometry()`) used for dirty tracking; can commit an `IMeshDeformer2D` via `ApplyDeformer()` |
 | `Texture2D` | Image dimensions plus pixel/UV conversion |
-| `IMeshDeformer2D`, `VertexOffsetDeformer2D` | Optional deformation extension point |
+| `MeshPrimitives2D`, `MeshGridGenerator2D`, `MeshGridOptions2D`, `IMeshMask2D`, `MeshMask2D` | Common textured quad, connected grid, and mask contour generation helpers |
+| `IMeshDeformer2D`, `VertexOffsetDeformer2D`, `RadialDragDeformer2D` | Optional deformation extension point and built-in reference deformers |
 | `Mesh2DSerializer` | JSON import/export |
 | `MeshHandle`, `MeshManager2D`, `MeshBatch2D` | Pooled mesh ownership, dirty-only extraction, texture batching |
-| `MeshRenderExtractor`, `MeshRenderData2D`, `IMeshRenderBackend2D`, `RenderTransform2D`, `RenderResourceHandle` | Backend-agnostic rendering pipeline |
+| `MeshRenderExtractor`, `MeshRenderData2D`, `MeshRenderData2DExtensions`, `MeshViewportLayout2D`, `IMeshRenderBackend2D`, `RenderTransform2D`, `RenderResourceHandle` | Backend-agnostic rendering pipeline |
 | `OpenGLMeshRenderBackend2D`, `Direct3D11MeshRenderBackend2D`, `VulkanMeshRenderBackend2D` | Optional backend implementations (see [Render Backends](#render-backends)) |
 
 ## Contributing

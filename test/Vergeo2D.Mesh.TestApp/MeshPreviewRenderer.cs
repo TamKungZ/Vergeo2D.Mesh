@@ -30,7 +30,7 @@ internal sealed class MeshPreviewRenderer : IDisposable
         gl.BindVertexArray(_vao);
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
 
-        var vertices = TestMeshFactory.ExpandIndexedTriangles(renderData);
+        var vertices = renderData.ExpandIndexedTriangles();
         _drawVertexCount = vertices.Length / MeshRenderData2D.FloatsPerVertex;
         UploadVertices(vertices);
 
@@ -62,7 +62,7 @@ internal sealed class MeshPreviewRenderer : IDisposable
 
     public void Update(MeshRenderData2D renderData)
     {
-        var vertices = TestMeshFactory.ExpandIndexedTriangles(renderData);
+        var vertices = renderData.ExpandIndexedTriangles();
         _drawVertexCount = vertices.Length / MeshRenderData2D.FloatsPerVertex;
         UploadVertices(vertices);
     }

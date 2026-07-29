@@ -9,7 +9,7 @@
 
   <PropertyGroup>
     <PackageId>Vergeo2D.Mesh</PackageId>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Authors>TamKungZ_</Authors>
     <Product>Vergeo2D.Mesh</Product>
     <Description>2D mesh library with vertex, edge and face structures, texture/UV binding, and an optional deformer extension point, for editing textured 2D meshes as a base for 2D rigging tools.</Description>

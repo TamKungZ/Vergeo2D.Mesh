@@ -12,6 +12,7 @@ internal static class GridMeshGenerator
     {
         var mesh = new Mesh2D();
         var spacing = Math.Clamp(settings.Spacing, 4, 512);
+        var supportPadding = Math.Clamp(spacing, 8, 128);
         var columns = Math.Max(1, (int)MathF.Ceiling(texture.Width / (float)spacing));
         var rows = Math.Max(1, (int)MathF.Ceiling(texture.Height / (float)spacing));
         var points = BuildGridPoints(texture, spacing, columns, rows);
@@ -21,7 +22,7 @@ internal static class GridMeshGenerator
         {
             for (var x = 0; x < columns; x++)
             {
-                AddCell(mesh, alphaMask, vertexIndices, points[x, y], points[x + 1, y], points[x + 1, y + 1], points[x, y + 1]);
+                AddCell(mesh, alphaMask, vertexIndices, supportPadding, points[x, y], points[x + 1, y], points[x + 1, y + 1], points[x, y + 1]);
             }
         }
 
@@ -50,13 +51,18 @@ internal static class GridMeshGenerator
         Mesh2D mesh,
         ImageAlphaMask alphaMask,
         Dictionary<(int X, int Y), int> vertexIndices,
+        int supportPadding,
         Vector2 topLeft,
         Vector2 topRight,
         Vector2 bottomRight,
         Vector2 bottomLeft)
     {
         var coverage = MeasureCoverage(alphaMask, topLeft, bottomRight);
-        if (coverage == CellCoverage.Empty) return;
+        if (coverage == CellCoverage.Empty)
+        {
+            AddSupportCellIfNearOpaque(mesh, alphaMask, vertexIndices, supportPadding, topLeft, topRight, bottomRight, bottomLeft);
+            return;
+        }
 
         if (coverage == CellCoverage.Full)
         {
@@ -64,13 +70,14 @@ internal static class GridMeshGenerator
             return;
         }
 
-        AddRefinedCell(mesh, alphaMask, vertexIndices, topLeft, bottomRight);
+        AddRefinedCell(mesh, alphaMask, vertexIndices, supportPadding, topLeft, bottomRight);
     }
 
     private static void AddRefinedCell(
         Mesh2D mesh,
         ImageAlphaMask alphaMask,
         Dictionary<(int X, int Y), int> vertexIndices,
+        int supportPadding,
         Vector2 topLeft,
         Vector2 bottomRight)
     {
@@ -91,6 +98,7 @@ internal static class GridMeshGenerator
                     mesh,
                     alphaMask,
                     vertexIndices,
+                    supportPadding,
                     a,
                     new Vector2(c.X, a.Y),
                     c,
@@ -103,13 +111,18 @@ internal static class GridMeshGenerator
         Mesh2D mesh,
         ImageAlphaMask alphaMask,
         Dictionary<(int X, int Y), int> vertexIndices,
+        int supportPadding,
         Vector2 topLeft,
         Vector2 topRight,
         Vector2 bottomRight,
         Vector2 bottomLeft)
     {
         var coverage = MeasureCoverage(alphaMask, topLeft, bottomRight);
-        if (coverage == CellCoverage.Empty) return;
+        if (coverage == CellCoverage.Empty)
+        {
+            AddSupportCellIfNearOpaque(mesh, alphaMask, vertexIndices, supportPadding, topLeft, topRight, bottomRight, bottomLeft);
+            return;
+        }
 
         if (coverage == CellCoverage.Full)
         {
@@ -147,6 +160,22 @@ internal static class GridMeshGenerator
         }
 
         AddPolygonFan(mesh, vertexIndices, BuildOpaquePolygon(alphaMask, corners, opaque));
+    }
+
+    private static void AddSupportCellIfNearOpaque(
+        Mesh2D mesh,
+        ImageAlphaMask alphaMask,
+        Dictionary<(int X, int Y), int> vertexIndices,
+        int supportPadding,
+        Vector2 topLeft,
+        Vector2 topRight,
+        Vector2 bottomRight,
+        Vector2 bottomLeft)
+    {
+        if (!alphaMask.ContainsOpaqueInRect(topLeft.X, topLeft.Y, bottomRight.X, bottomRight.Y, supportPadding))
+            return;
+
+        AddQuad(mesh, vertexIndices, topLeft, topRight, bottomRight, bottomLeft);
     }
 
     private static CellCoverage MeasureCoverage(ImageAlphaMask alphaMask, Vector2 topLeft, Vector2 bottomRight)

@@ -96,7 +96,7 @@ internal sealed class MeshPreviewRenderer : IDisposable
             vec2 ndc = vec2((screenPixel.x / uViewport.x) * 2.0 - 1.0, 1.0 - (screenPixel.y / uViewport.y) * 2.0);
             gl_Position = vec4(ndc, 0.0, 1.0);
             vImagePixel = aPosition * uImageScale;
-            vUv = vec2(aUv.x, 1.0 - aUv.y);
+            vUv = aUv;
         }
         """;
 

@@ -15,16 +15,16 @@ public static class MeshPrimitives2D
         if (texture is null) throw new ArgumentNullException(nameof(texture));
 
         var mesh = new Mesh2D();
-        var topLeft = mesh.AddVertex(origin);
-        var topRight = mesh.AddVertex(origin + new Vector2(size.X, 0f));
-        var bottomRight = mesh.AddVertex(origin + size);
-        var bottomLeft = mesh.AddVertex(origin + new Vector2(0f, size.Y));
+        var topV = flipY ? 1f : 0f;
+        var bottomV = flipY ? 0f : 1f;
+        var topLeft = mesh.AddVertex(origin, new Vector2(0f, topV));
+        var topRight = mesh.AddVertex(origin + new Vector2(size.X, 0f), new Vector2(1f, topV));
+        var bottomRight = mesh.AddVertex(origin + size, new Vector2(1f, bottomV));
+        var bottomLeft = mesh.AddVertex(origin + new Vector2(0f, size.Y), new Vector2(0f, bottomV));
 
         mesh.AddFace(topLeft, topRight, bottomRight);
         mesh.AddFace(topLeft, bottomRight, bottomLeft);
         mesh.SetTexture(texture);
-        mesh.GenerateUVsFromPositions(flipY);
         return mesh;
     }
 }
-

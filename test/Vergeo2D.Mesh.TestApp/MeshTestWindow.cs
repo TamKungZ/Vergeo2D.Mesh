@@ -23,6 +23,7 @@ internal sealed class MeshTestWindow : IDisposable
     private readonly IWindow _window;
     private readonly string _imagePath;
     private readonly MeshRenderData2D _renderData = new();
+    private readonly MeshRenderData2D _overlayRenderData = new();
     private readonly MeshGenerationSettings _generationSettings = new();
     private readonly RadialDragDeformer2D _dragDeformer = new();
 
@@ -35,6 +36,7 @@ internal sealed class MeshTestWindow : IDisposable
     private Texture2D? _textureInfo;
     private ImageAlphaMask? _alphaMask;
     private Mesh2D? _mesh;
+    private Mesh2D? _overlayMesh;
     private Vector2 _dragOriginImage;
     private bool _showUvOverlay;
     private bool _isDragging;
@@ -201,8 +203,8 @@ internal sealed class MeshTestWindow : IDisposable
         BitmapTextRenderer.Draw(solid, "PREVIEW TRANSPARENT", IncludeTransparentCheckboxOrigin + new Vector2(28f, 2f), 2f, new Vector4(0.9f, 0.92f, 0.94f, 1f));
         DrawButton(solid, GenerateButtonOrigin, GenerateButtonSize, "GENERATE");
 
-        BitmapTextRenderer.Draw(solid, $"VERTICES: {_renderData.VertexCount}", new Vector2(18f, 326f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
-        BitmapTextRenderer.Draw(solid, $"FACES: {_renderData.IndexCount / 3}", new Vector2(18f, 350f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
+        BitmapTextRenderer.Draw(solid, $"VERTICES: {_overlayRenderData.VertexCount}", new Vector2(18f, 326f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
+        BitmapTextRenderer.Draw(solid, $"FACES: {_overlayRenderData.IndexCount / 3}", new Vector2(18f, 350f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
 
         if (!_showUvOverlay) return;
 
@@ -288,25 +290,28 @@ internal sealed class MeshTestWindow : IDisposable
     {
         if (_gl is null || _textureInfo is null || _alphaMask is null) return;
 
-        _mesh = GridMeshGenerator.Generate(_textureInfo, _alphaMask, _generationSettings);
+        _mesh = ConnectedMeshGenerator.Generate(_textureInfo, _alphaMask, _generationSettings);
+        _overlayMesh = GridMeshGenerator.Generate(_textureInfo, _alphaMask, _generationSettings);
         _dragDeformer.Clear();
         _dragDeformer.Radius = Math.Max(120f, _generationSettings.Spacing * 3f);
 
         _renderData.Clear();
         MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);
+        _overlayRenderData.Clear();
+        MeshRenderExtractor.Extract(_overlayMesh, deformer: null, _overlayRenderData);
         _preview?.Dispose();
         _preview = new MeshPreviewRenderer(_gl, _imagePath, _renderData);
-        _uvOverlay = new UvOverlayRenderer(_renderData);
-        Console.WriteLine($"Generated shape mesh: {_renderData.VertexCount} vertices, {_renderData.IndexCount / 3} faces, spacing {_generationSettings.Spacing}");
+        _uvOverlay = new UvOverlayRenderer(_overlayRenderData);
+        Console.WriteLine($"Generated shape mesh: {_overlayRenderData.VertexCount} vertices, {_overlayRenderData.IndexCount / 3} faces, spacing {_generationSettings.Spacing}");
     }
 
     private void BeginImageDrag(Vector2 screenPoint)
     {
-        if (_mesh is null || _alphaMask is null || screenPoint.X < PanelWidth) return;
+        if (_mesh is null || _overlayMesh is null || _alphaMask is null || screenPoint.X < PanelWidth) return;
         var imagePoint = ScreenToImage(screenPoint);
         if (!IsInsideImage(imagePoint)) return;
         if (!_alphaMask.IsOpaqueAt(imagePoint.X, imagePoint.Y)) return;
-        if (_mesh.FindFaceAt(imagePoint) < 0) return;
+        if (_overlayMesh.FindFaceAt(imagePoint) < 0) return;
 
         _dragOriginImage = imagePoint;
         _dragDeformer.SetDrag(_dragOriginImage, Vector2.Zero);
@@ -316,24 +321,32 @@ internal sealed class MeshTestWindow : IDisposable
 
     private void RefreshDeformedMesh()
     {
-        if (_mesh is null || _preview is null) return;
+        if (_mesh is null || _overlayMesh is null || _preview is null) return;
 
         _renderData.Clear();
         MeshRenderExtractor.Extract(_mesh, _dragDeformer.HasDrag ? _dragDeformer : null, _renderData);
+        _overlayRenderData.Clear();
+        MeshRenderExtractor.Extract(_overlayMesh, _dragDeformer.HasDrag ? _dragDeformer : null, _overlayRenderData);
         _preview.Update(_renderData);
-        _uvOverlay = new UvOverlayRenderer(_renderData);
+        _uvOverlay = new UvOverlayRenderer(_overlayRenderData);
     }
 
     private void CommitDragToMesh()
     {
-        if (_mesh is null || !_dragDeformer.HasDrag) return;
+        if (_mesh is null || _overlayMesh is null || !_dragDeformer.HasDrag) return;
 
-        var deformedPositions = _dragDeformer.Deform(_mesh);
-        for (var i = 0; i < _mesh.Vertices.Count; i++)
-            _mesh.Vertices[i].Position = deformedPositions[i];
+        CommitDeformedPositions(_mesh);
+        CommitDeformedPositions(_overlayMesh);
 
         _dragDeformer.Clear();
         RefreshDeformedMesh();
+    }
+
+    private void CommitDeformedPositions(Mesh2D mesh)
+    {
+        var deformedPositions = _dragDeformer.Deform(mesh);
+        for (var i = 0; i < mesh.Vertices.Count; i++)
+            mesh.Vertices[i].Position = deformedPositions[i];
     }
 
     private Vector2 ScreenToImage(Vector2 screenPoint)

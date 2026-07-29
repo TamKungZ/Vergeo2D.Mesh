@@ -24,6 +24,7 @@ dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj -- 
 
 - Loads image dimensions through `Texture2D.LoadFromFile`.
 - Generates a triangle mesh from the image alpha silhouette.
+- Uses a connected render mesh behind the preview so large drags do not tear the texture.
 - Generates UVs from mesh positions.
 - Extracts render buffers with `MeshRenderExtractor`.
 - Uploads the extracted vertices and indices to OpenGL and draws the texture in a window.

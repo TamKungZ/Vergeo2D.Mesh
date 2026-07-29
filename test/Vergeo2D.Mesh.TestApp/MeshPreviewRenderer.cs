@@ -97,7 +97,6 @@ internal sealed class MeshPreviewRenderer : IDisposable
         uniform vec2 uImageOrigin;
         uniform float uImageScale;
 
-        out vec2 vImagePixel;
         out vec2 vUv;
 
         void main()
@@ -105,14 +104,12 @@ internal sealed class MeshPreviewRenderer : IDisposable
             vec2 screenPixel = (aPosition * uImageScale) + uImageOrigin;
             vec2 ndc = vec2((screenPixel.x / uViewport.x) * 2.0 - 1.0, 1.0 - (screenPixel.y / uViewport.y) * 2.0);
             gl_Position = vec4(ndc, 0.0, 1.0);
-            vImagePixel = aPosition * uImageScale;
             vUv = aUv;
         }
         """;
 
     private const string FragmentShaderSource = """
         #version 330 core
-        in vec2 vImagePixel;
         in vec2 vUv;
         out vec4 FragColor;
 
@@ -120,11 +117,7 @@ internal sealed class MeshPreviewRenderer : IDisposable
 
         void main()
         {
-            vec4 color = texture(uTexture, vUv);
-            float square = 16.0;
-            float checkerIndex = mod(floor(vImagePixel.x / square) + floor(vImagePixel.y / square), 2.0);
-            vec3 checker = mix(vec3(0.70), vec3(0.90), checkerIndex);
-            FragColor = vec4(mix(checker, color.rgb, color.a), 1.0);
+            FragColor = texture(uTexture, vUv);
         }
         """;
 }

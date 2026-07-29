@@ -23,13 +23,11 @@ internal sealed class MeshTestWindow : IDisposable
     private readonly IWindow _window;
     private readonly string _imagePath;
     private readonly MeshRenderData2D _renderData = new();
-    private readonly MeshRenderData2D _canvasRenderData = new();
     private readonly MeshGenerationSettings _generationSettings = new();
     private readonly RadialDragDeformer2D _dragDeformer = new();
 
     private GL? _gl;
     private MeshPreviewRenderer? _preview;
-    private MeshPreviewRenderer? _canvasPreview;
     private Solid2DRenderer? _solid;
     private UvOverlayRenderer? _uvOverlay;
     private IInputContext? _input;
@@ -87,8 +85,6 @@ internal sealed class MeshTestWindow : IDisposable
         Console.WriteLine($"Texture: {_textureInfo.Width}x{_textureInfo.Height}");
 
         _imageSize = new Vector2(_textureInfo.Width, _textureInfo.Height);
-        MeshRenderExtractor.Extract(TestMeshFactory.CreateImageMesh(_textureInfo), deformer: null, _canvasRenderData);
-        _canvasPreview = new MeshPreviewRenderer(gl, _imagePath, _canvasRenderData);
         _solid = new Solid2DRenderer(gl);
         GenerateMesh();
 
@@ -108,7 +104,7 @@ internal sealed class MeshTestWindow : IDisposable
         var layout = GetImageLayout();
 
         if (_generationSettings.PreviewTransparent)
-            _canvasPreview?.Draw(viewport, layout.Origin, layout.Scale);
+            DrawCheckerboard(viewport, layout.Origin, _imageSize * layout.Scale, layout.Scale);
 
         _preview?.Draw(viewport, layout.Origin, layout.Scale);
         DrawUi(viewport, layout.Origin, layout.Scale);
@@ -218,6 +214,30 @@ internal sealed class MeshTestWindow : IDisposable
     {
         solid.DrawRect(Vector2.Zero, new Vector2(PanelWidth, viewportHeight), new Vector4(0.07f, 0.08f, 0.09f, 0.92f));
         BitmapTextRenderer.Draw(solid, "TEST MESH", new Vector2(18f, 20f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
+    }
+
+    private void DrawCheckerboard(Vector2D<int> viewport, Vector2 origin, Vector2 size, float imageScale)
+    {
+        var solid = _solid!;
+        var squareSize = Math.Max(4f, MathF.Round(16f * imageScale));
+        var columns = (int)MathF.Ceiling(size.X / squareSize);
+        var rows = (int)MathF.Ceiling(size.Y / squareSize);
+        var light = new Vector4(0.78f, 0.78f, 0.78f, 1f);
+        var dark = new Vector4(0.64f, 0.64f, 0.64f, 1f);
+
+        solid.Begin(viewport);
+        for (var y = 0; y < rows; y++)
+        {
+            for (var x = 0; x < columns; x++)
+            {
+                var rectOrigin = origin + new Vector2(x * squareSize, y * squareSize);
+                var rectSize = new Vector2(
+                    Math.Min(squareSize, origin.X + size.X - rectOrigin.X),
+                    Math.Min(squareSize, origin.Y + size.Y - rectOrigin.Y));
+                var color = ((x + y) & 1) == 0 ? light : dark;
+                solid.DrawRect(rectOrigin, rectSize, color);
+            }
+        }
     }
 
     private static void DrawCheckbox(Solid2DRenderer solid, Vector2 origin, bool isChecked)
@@ -366,7 +386,6 @@ internal sealed class MeshTestWindow : IDisposable
     public void Dispose()
     {
         _preview?.Dispose();
-        _canvasPreview?.Dispose();
         _solid?.Dispose();
         _input?.Dispose();
     }

@@ -15,7 +15,7 @@ A lightweight C# library for editing 2D texture meshes — vertices, edges, face
 
 | Preview 1 | Preview 2 |
 |---|---|
-| ![Vergeo2D.Mesh preview 1](http://static.tamkungz.me/assets-image/vergeo2d/preview-1.png) | ![Vergeo2D.Mesh preview 2](http://static.tamkungz.me/assets-image/vergeo2d/preview-2.png) |
+| ![Vergeo2D.Mesh preview 1](https://raw.githubusercontent.com/TamKungZ/Vergeo2D.Mesh/refs/heads/master/assets/preview/preview-1.png) | ![Vergeo2D.Mesh preview 2](https://raw.githubusercontent.com/TamKungZ/Vergeo2D.Mesh/refs/heads/master/assets/preview/preview-2.png) |
 
 ## Install
 

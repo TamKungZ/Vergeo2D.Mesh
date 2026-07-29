@@ -6,7 +6,7 @@ Small OpenGL smoke test for wiring `Vergeo2D.Mesh` into a real window and drawin
 
 | Preview 1 | Preview 2 |
 |---|---|
-| ![Vergeo2D.Mesh test preview 1](http://static.tamkungz.me/assets-image/vergeo2d/preview-1.png) | ![Vergeo2D.Mesh test preview 2](http://static.tamkungz.me/assets-image/vergeo2d/preview-2.png) |
+| ![Vergeo2D.Mesh test preview 1](https://raw.githubusercontent.com/TamKungZ/Vergeo2D.Mesh/refs/heads/master/assets/preview/preview-1.png) | ![Vergeo2D.Mesh test preview 2](https://raw.githubusercontent.com/TamKungZ/Vergeo2D.Mesh/refs/heads/master/assets/preview/preview-2.png) |
 
 ## Run
 

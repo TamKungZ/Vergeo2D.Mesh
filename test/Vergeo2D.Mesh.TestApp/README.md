@@ -2,6 +2,12 @@
 
 Small OpenGL smoke test for wiring `Vergeo2D.Mesh` into a real window and drawing a textured mesh.
 
+## Preview
+
+| Preview 1 | Preview 2 |
+|---|---|
+| ![Vergeo2D.Mesh test preview 1](http://static.tamkungz.me/assets-image/vergeo2d/preview-1.png) | ![Vergeo2D.Mesh test preview 2](http://static.tamkungz.me/assets-image/vergeo2d/preview-2.png) |
+
 ## Run
 
 ```bash

@@ -1,4 +1,5 @@
 using System.Numerics;
+using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
@@ -18,7 +19,7 @@ if (!File.Exists(imagePath))
 
 var options = WindowOptions.Default;
 options.Title = "Vergeo2D.Mesh Test Render";
-options.Size = new Vector2D<int>(960, 720);
+options.Size = new Vector2D<int>(1280, 720);
 options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(3, 3));
 
 using var app = new MeshTestWindow(options, imagePath);
@@ -27,6 +28,11 @@ return 0;
 
 internal sealed class MeshTestWindow : IDisposable
 {
+    private const int MinimumWidth = 1280;
+    private const int MinimumHeight = 720;
+    private static readonly Vector2 CheckboxOrigin = new(16f, 18f);
+    private const float CheckboxSize = 18f;
+
     private readonly IWindow _window;
     private readonly string _imagePath;
     private readonly MeshRenderData2D _renderData = new();
@@ -36,11 +42,18 @@ internal sealed class MeshTestWindow : IDisposable
     private uint _vbo;
     private uint _texture;
     private uint _shader;
+    private uint _solidVao;
+    private uint _solidVbo;
+    private uint _solidShader;
     private int _drawVertexCount;
     private int _viewportUniform;
     private int _imageOriginUniform;
     private int _imageScaleUniform;
+    private int _solidViewportUniform;
+    private int _solidColorUniform;
     private Vector2 _imageSize;
+    private IInputContext? _input;
+    private bool _showUvOverlay;
     private bool _reportedDrawError;
 
     public MeshTestWindow(WindowOptions options, string imagePath)
@@ -49,6 +62,7 @@ internal sealed class MeshTestWindow : IDisposable
         _window = Window.Create(options);
         _window.Load += OnLoad;
         _window.Render += OnRender;
+        _window.Resize += OnWindowResize;
         _window.FramebufferResize += OnResize;
         _window.Closing += Dispose;
     }
@@ -70,6 +84,12 @@ internal sealed class MeshTestWindow : IDisposable
         gl.Disable(EnableCap.StencilTest);
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        gl.LineWidth(1f);
+        gl.PointSize(8f);
+
+        _input = _window.CreateInput();
+        foreach (var mouse in _input.Mice)
+            mouse.MouseDown += OnMouseDown;
 
         var textureInfo = Texture2D.LoadFromFile(_imagePath);
         var mesh = CreateImageMesh(textureInfo);
@@ -83,10 +103,15 @@ internal sealed class MeshTestWindow : IDisposable
         _viewportUniform = gl.GetUniformLocation(_shader, "uViewport");
         _imageOriginUniform = gl.GetUniformLocation(_shader, "uImageOrigin");
         _imageScaleUniform = gl.GetUniformLocation(_shader, "uImageScale");
+        _solidShader = CreateSolidShaderProgram(gl);
+        _solidViewportUniform = gl.GetUniformLocation(_solidShader, "uViewport");
+        _solidColorUniform = gl.GetUniformLocation(_solidShader, "uColor");
         _texture = LoadTexture(gl, _imagePath);
 
         _vao = gl.GenVertexArray();
         _vbo = gl.GenBuffer();
+        _solidVao = gl.GenVertexArray();
+        _solidVbo = gl.GenBuffer();
 
         gl.BindVertexArray(_vao);
 
@@ -109,6 +134,13 @@ internal sealed class MeshTestWindow : IDisposable
         gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride, (void*)(2 * sizeof(float)));
 
         gl.BindVertexArray(0);
+
+        gl.BindVertexArray(_solidVao);
+        gl.BindBuffer(BufferTargetARB.ArrayBuffer, _solidVbo);
+        gl.EnableVertexAttribArray(0);
+        gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 2 * sizeof(float), null);
+        gl.BindVertexArray(0);
+
         CheckGl(gl, "create mesh buffers");
         OnResize(_window.FramebufferSize);
     }
@@ -135,13 +167,38 @@ internal sealed class MeshTestWindow : IDisposable
         gl.BindTexture(TextureTarget.Texture2D, _texture);
         gl.BindVertexArray(_vao);
         gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)_drawVertexCount);
+
+        DrawUi(gl, viewport, imageOrigin, imageScale);
+
         if (!_reportedDrawError)
             _reportedDrawError = !CheckGl(gl, "draw frame");
+    }
+
+    private void OnWindowResize(Vector2D<int> size)
+    {
+        var width = Math.Max(size.X, MinimumWidth);
+        var height = Math.Max(size.Y, MinimumHeight);
+        if (width != size.X || height != size.Y)
+            _window.Size = new Vector2D<int>(width, height);
     }
 
     private void OnResize(Vector2D<int> size)
     {
         _gl?.Viewport(size);
+    }
+
+    private void OnMouseDown(IMouse mouse, MouseButton button)
+    {
+        if (button != MouseButton.Left) return;
+
+        var position = mouse.Position;
+        var inside =
+            position.X >= CheckboxOrigin.X &&
+            position.X <= CheckboxOrigin.X + CheckboxSize &&
+            position.Y >= CheckboxOrigin.Y &&
+            position.Y <= CheckboxOrigin.Y + CheckboxSize;
+
+        if (inside) _showUvOverlay = !_showUvOverlay;
     }
 
     private static Mesh2D CreateImageMesh(Texture2D texture)
@@ -177,6 +234,142 @@ internal sealed class MeshTestWindow : IDisposable
         }
 
         return expanded;
+    }
+
+    private void DrawUi(GL gl, Vector2D<int> viewport, Vector2 imageOrigin, float imageScale)
+    {
+        gl.UseProgram(_solidShader);
+        gl.Uniform2(_solidViewportUniform, (float)viewport.X, (float)viewport.Y);
+        gl.BindVertexArray(_solidVao);
+
+        DrawRect(gl, CheckboxOrigin, new Vector2(CheckboxSize, CheckboxSize), new Vector4(0.18f, 0.20f, 0.22f, 0.95f));
+        DrawLineLoop(gl, CheckboxVertices(), new Vector4(0.85f, 0.88f, 0.90f, 1f));
+
+        if (_showUvOverlay)
+        {
+            DrawCheckMark(gl);
+            DrawUvOverlay(gl, imageOrigin, imageScale);
+        }
+    }
+
+    private void DrawUvOverlay(GL gl, Vector2 imageOrigin, float imageScale)
+    {
+        var sourceVertices = _renderData.Vertices;
+        var sourceIndices = _renderData.Indices;
+        var faceVertices = new float[sourceIndices.Length * 2];
+
+        for (var i = 0; i < sourceIndices.Length; i++)
+        {
+            var vertexOffset = sourceIndices[i] * MeshRenderData2D.FloatsPerVertex;
+            var uv = new Vector2(sourceVertices[vertexOffset + 2], sourceVertices[vertexOffset + 3]);
+            var screen = UvToScreen(uv, imageOrigin, imageScale);
+            var targetOffset = i * 2;
+            faceVertices[targetOffset] = screen.X;
+            faceVertices[targetOffset + 1] = screen.Y;
+        }
+
+        DrawTriangles(gl, faceVertices, new Vector4(0.15f, 0.55f, 1f, 0.18f));
+
+        for (var i = 0; i < sourceIndices.Length; i += 3)
+        {
+            DrawLineLoop(gl, new[]
+            {
+                faceVertices[i * 2], faceVertices[i * 2 + 1],
+                faceVertices[(i + 1) * 2], faceVertices[(i + 1) * 2 + 1],
+                faceVertices[(i + 2) * 2], faceVertices[(i + 2) * 2 + 1]
+            }, new Vector4(0.05f, 0.45f, 1f, 0.95f));
+        }
+
+        DrawPoints(gl, faceVertices, new Vector4(1f, 0.25f, 0.15f, 1f));
+    }
+
+    private Vector2 UvToScreen(Vector2 uv, Vector2 imageOrigin, float imageScale)
+    {
+        return imageOrigin + new Vector2(uv.X * _imageSize.X, uv.Y * _imageSize.Y) * imageScale;
+    }
+
+    private void DrawCheckMark(GL gl)
+    {
+        var x = CheckboxOrigin.X;
+        var y = CheckboxOrigin.Y;
+        var points = new[]
+        {
+            x + 4f, y + 9f,
+            x + 8f, y + 13f,
+            x + 14f, y + 5f
+        };
+        DrawLines(gl, points, new Vector4(0.25f, 0.95f, 0.45f, 1f), lineStrip: true);
+    }
+
+    private static float[] CheckboxVertices()
+    {
+        var x = CheckboxOrigin.X;
+        var y = CheckboxOrigin.Y;
+        return new[]
+        {
+            x, y,
+            x + CheckboxSize, y,
+            x + CheckboxSize, y + CheckboxSize,
+            x, y + CheckboxSize
+        };
+    }
+
+    private void DrawRect(GL gl, Vector2 origin, Vector2 size, Vector4 color)
+    {
+        var x = origin.X;
+        var y = origin.Y;
+        var w = size.X;
+        var h = size.Y;
+        DrawTriangles(gl, new[]
+        {
+            x, y,
+            x + w, y,
+            x + w, y + h,
+            x, y,
+            x + w, y + h,
+            x, y + h
+        }, color);
+    }
+
+    private void DrawTriangles(GL gl, float[] vertices, Vector4 color)
+    {
+        UploadSolidVertices(gl, vertices);
+        gl.Uniform4(_solidColorUniform, color.X, color.Y, color.Z, color.W);
+        gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)(vertices.Length / 2));
+    }
+
+    private void DrawLineLoop(GL gl, float[] vertices, Vector4 color)
+    {
+        UploadSolidVertices(gl, vertices);
+        gl.Uniform4(_solidColorUniform, color.X, color.Y, color.Z, color.W);
+        gl.DrawArrays(PrimitiveType.LineLoop, 0, (uint)(vertices.Length / 2));
+    }
+
+    private void DrawPoints(GL gl, float[] vertices, Vector4 color)
+    {
+        UploadSolidVertices(gl, vertices);
+        gl.Uniform4(_solidColorUniform, color.X, color.Y, color.Z, color.W);
+        gl.DrawArrays(PrimitiveType.Points, 0, (uint)(vertices.Length / 2));
+    }
+
+    private void DrawLines(GL gl, float[] vertices, Vector4 color, bool lineStrip = false)
+    {
+        UploadSolidVertices(gl, vertices);
+        gl.Uniform4(_solidColorUniform, color.X, color.Y, color.Z, color.W);
+        gl.DrawArrays(lineStrip ? PrimitiveType.LineStrip : PrimitiveType.Lines, 0, (uint)(vertices.Length / 2));
+    }
+
+    private unsafe void UploadSolidVertices(GL gl, float[] vertices)
+    {
+        gl.BindBuffer(BufferTargetARB.ArrayBuffer, _solidVbo);
+        fixed (float* pointer = vertices)
+        {
+            gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                (nuint)(vertices.Length * sizeof(float)),
+                pointer,
+                BufferUsageARB.StreamDraw);
+        }
     }
 
     private static unsafe uint LoadTexture(GL gl, string path)
@@ -229,7 +422,7 @@ internal sealed class MeshTestWindow : IDisposable
                 vec2 ndc = vec2((screenPixel.x / uViewport.x) * 2.0 - 1.0, 1.0 - (screenPixel.y / uViewport.y) * 2.0);
                 gl_Position = vec4(ndc, 0.0, 1.0);
                 vImagePixel = aPosition * uImageScale;
-                vUv = aUv;
+                vUv = vec2(aUv.x, 1.0 - aUv.y);
             }
             """);
 
@@ -267,6 +460,47 @@ internal sealed class MeshTestWindow : IDisposable
         return program;
     }
 
+    private static uint CreateSolidShaderProgram(GL gl)
+    {
+        var vertexShader = CompileShader(gl, ShaderType.VertexShader, """
+            #version 330 core
+            layout (location = 0) in vec2 aPosition;
+
+            uniform vec2 uViewport;
+
+            void main()
+            {
+                vec2 ndc = vec2((aPosition.x / uViewport.x) * 2.0 - 1.0, 1.0 - (aPosition.y / uViewport.y) * 2.0);
+                gl_Position = vec4(ndc, 0.0, 1.0);
+            }
+            """);
+
+        var fragmentShader = CompileShader(gl, ShaderType.FragmentShader, """
+            #version 330 core
+            out vec4 FragColor;
+
+            uniform vec4 uColor;
+
+            void main()
+            {
+                FragColor = uColor;
+            }
+            """);
+
+        var program = gl.CreateProgram();
+        gl.AttachShader(program, vertexShader);
+        gl.AttachShader(program, fragmentShader);
+        gl.BindFragDataLocation(program, 0, "FragColor");
+        gl.LinkProgram(program);
+
+        gl.GetProgram(program, ProgramPropertyARB.LinkStatus, out var status);
+        if (status == 0) throw new InvalidOperationException(gl.GetProgramInfoLog(program));
+
+        gl.DeleteShader(vertexShader);
+        gl.DeleteShader(fragmentShader);
+        return program;
+    }
+
     private static bool CheckGl(GL gl, string stage)
     {
         var error = gl.GetError();
@@ -296,8 +530,12 @@ internal sealed class MeshTestWindow : IDisposable
         if (_gl is null) return;
 
         _gl.DeleteBuffer(_vbo);
+        _gl.DeleteBuffer(_solidVbo);
         _gl.DeleteVertexArray(_vao);
+        _gl.DeleteVertexArray(_solidVao);
         _gl.DeleteTexture(_texture);
         _gl.DeleteProgram(_shader);
+        _gl.DeleteProgram(_solidShader);
+        _input?.Dispose();
     }
 }

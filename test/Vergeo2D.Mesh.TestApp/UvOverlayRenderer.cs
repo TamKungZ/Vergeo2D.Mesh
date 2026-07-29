@@ -9,12 +9,9 @@ internal sealed class UvOverlayRenderer
     private static readonly Vector4 VertexColor = new(1f, 0.25f, 0.15f, 1f);
 
     private readonly MeshRenderData2D _renderData;
-    private readonly Vector2 _imageSize;
-
-    public UvOverlayRenderer(MeshRenderData2D renderData, Vector2 imageSize)
+    public UvOverlayRenderer(MeshRenderData2D renderData)
     {
         _renderData = renderData;
-        _imageSize = imageSize;
     }
 
     public void Draw(Solid2DRenderer solid, Vector2 imageOrigin, float imageScale)
@@ -26,8 +23,8 @@ internal sealed class UvOverlayRenderer
         for (var i = 0; i < sourceIndices.Length; i++)
         {
             var vertexOffset = sourceIndices[i] * MeshRenderData2D.FloatsPerVertex;
-            var uv = new Vector2(sourceVertices[vertexOffset + 2], sourceVertices[vertexOffset + 3]);
-            var screen = UvToScreen(uv, imageOrigin, imageScale);
+            var position = new Vector2(sourceVertices[vertexOffset], sourceVertices[vertexOffset + 1]);
+            var screen = ImageToScreen(position, imageOrigin, imageScale);
             var targetOffset = i * 2;
             faceVertices[targetOffset] = screen.X;
             faceVertices[targetOffset + 1] = screen.Y;
@@ -48,8 +45,8 @@ internal sealed class UvOverlayRenderer
         solid.DrawPoints(faceVertices, VertexColor);
     }
 
-    private Vector2 UvToScreen(Vector2 uv, Vector2 imageOrigin, float imageScale)
+    private static Vector2 ImageToScreen(Vector2 position, Vector2 imageOrigin, float imageScale)
     {
-        return imageOrigin + new Vector2(uv.X * _imageSize.X, uv.Y * _imageSize.Y) * imageScale;
+        return imageOrigin + position * imageScale;
     }
 }

@@ -23,8 +23,8 @@ dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj -- 
 ## What It Tests
 
 - Loads image dimensions through `Texture2D.LoadFromFile`.
-- Builds a four-vertex quad mesh with two triangle faces.
+- Generates a triangle mesh from the image alpha silhouette.
 - Generates UVs from mesh positions.
 - Extracts render buffers with `MeshRenderExtractor`.
 - Uploads the extracted vertices and indices to OpenGL and draws the texture in a window.
-
+- Uses an `IMeshDeformer2D` implementation to stretch the generated mesh with mouse drag input.

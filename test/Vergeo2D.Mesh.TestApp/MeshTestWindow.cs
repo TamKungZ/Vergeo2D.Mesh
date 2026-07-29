@@ -25,6 +25,7 @@ internal sealed class MeshTestWindow : IDisposable
     private readonly MeshRenderData2D _renderData = new();
     private readonly MeshRenderData2D _canvasRenderData = new();
     private readonly MeshGenerationSettings _generationSettings = new();
+    private readonly RadialDragDeformer2D _dragDeformer = new();
 
     private GL? _gl;
     private MeshPreviewRenderer? _preview;
@@ -35,7 +36,10 @@ internal sealed class MeshTestWindow : IDisposable
     private Vector2 _imageSize;
     private Texture2D? _textureInfo;
     private ImageAlphaMask? _alphaMask;
+    private Mesh2D? _mesh;
+    private Vector2 _dragOriginImage;
     private bool _showUvOverlay;
+    private bool _isDragging;
     private bool _reportedDrawError;
 
     public MeshTestWindow(WindowOptions options, string imagePath)
@@ -71,7 +75,11 @@ internal sealed class MeshTestWindow : IDisposable
 
         _input = _window.CreateInput();
         foreach (var mouse in _input.Mice)
+        {
             mouse.MouseDown += OnMouseDown;
+            mouse.MouseMove += OnMouseMove;
+            mouse.MouseUp += OnMouseUp;
+        }
 
         _textureInfo = Texture2D.LoadFromFile(_imagePath);
         _alphaMask = ImageAlphaMask.Load(_imagePath);
@@ -97,17 +105,13 @@ internal sealed class MeshTestWindow : IDisposable
         gl.Viewport(viewport);
         gl.Clear(ClearBufferMask.ColorBufferBit);
 
-        var imageScale = MathF.Min(viewport.X / _imageSize.X, viewport.Y / _imageSize.Y);
-        var scaledImageSize = _imageSize * imageScale;
-        var imageOrigin = new Vector2(
-            MathF.Round((viewport.X - scaledImageSize.X) * 0.5f),
-            MathF.Round((viewport.Y - scaledImageSize.Y) * 0.5f));
+        var layout = GetImageLayout();
 
         if (_generationSettings.PreviewTransparent)
-            _canvasPreview?.Draw(viewport, imageOrigin, imageScale);
+            _canvasPreview?.Draw(viewport, layout.Origin, layout.Scale);
 
-        _preview?.Draw(viewport, imageOrigin, imageScale);
-        DrawUi(viewport, imageOrigin, imageScale);
+        _preview?.Draw(viewport, layout.Origin, layout.Scale);
+        DrawUi(viewport, layout.Origin, layout.Scale);
 
         if (!_reportedDrawError)
             _reportedDrawError = !CheckGl(gl, "draw frame");
@@ -158,7 +162,29 @@ internal sealed class MeshTestWindow : IDisposable
         }
 
         if (Contains(point, GenerateButtonOrigin, GenerateButtonSize))
+        {
             GenerateMesh();
+            return;
+        }
+
+        BeginImageDrag(point);
+    }
+
+    private void OnMouseMove(IMouse mouse, Vector2 position)
+    {
+        if (!_isDragging) return;
+
+        var imagePoint = ScreenToImage(position);
+        _dragDeformer.SetDrag(_dragOriginImage, imagePoint - _dragOriginImage);
+        RefreshDeformedMesh();
+    }
+
+    private void OnMouseUp(IMouse mouse, MouseButton button)
+    {
+        if (button != MouseButton.Left) return;
+
+        _isDragging = false;
+        CommitDragToMesh();
     }
 
     private void DrawUi(Vector2D<int> viewport, Vector2 imageOrigin, float imageScale)
@@ -242,13 +268,78 @@ internal sealed class MeshTestWindow : IDisposable
     {
         if (_gl is null || _textureInfo is null || _alphaMask is null) return;
 
-        var mesh = GridMeshGenerator.Generate(_textureInfo, _alphaMask, _generationSettings);
+        _mesh = GridMeshGenerator.Generate(_textureInfo, _alphaMask, _generationSettings);
+        _dragDeformer.Clear();
+        _dragDeformer.Radius = Math.Max(120f, _generationSettings.Spacing * 3f);
+
         _renderData.Clear();
-        MeshRenderExtractor.Extract(mesh, deformer: null, _renderData);
+        MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);
         _preview?.Dispose();
         _preview = new MeshPreviewRenderer(_gl, _imagePath, _renderData);
-        _uvOverlay = new UvOverlayRenderer(_renderData, _imageSize);
+        _uvOverlay = new UvOverlayRenderer(_renderData);
         Console.WriteLine($"Generated shape mesh: {_renderData.VertexCount} vertices, {_renderData.IndexCount / 3} faces, spacing {_generationSettings.Spacing}");
+    }
+
+    private void BeginImageDrag(Vector2 screenPoint)
+    {
+        if (_mesh is null || screenPoint.X < PanelWidth) return;
+        var imagePoint = ScreenToImage(screenPoint);
+        if (!IsInsideImage(imagePoint)) return;
+        if (_mesh.FindFaceAt(imagePoint) < 0) return;
+
+        _dragOriginImage = imagePoint;
+        _dragDeformer.SetDrag(_dragOriginImage, Vector2.Zero);
+        _isDragging = true;
+        RefreshDeformedMesh();
+    }
+
+    private void RefreshDeformedMesh()
+    {
+        if (_mesh is null || _preview is null) return;
+
+        _renderData.Clear();
+        MeshRenderExtractor.Extract(_mesh, _dragDeformer.HasDrag ? _dragDeformer : null, _renderData);
+        _preview.Update(_renderData);
+        _uvOverlay = new UvOverlayRenderer(_renderData);
+    }
+
+    private void CommitDragToMesh()
+    {
+        if (_mesh is null || !_dragDeformer.HasDrag) return;
+
+        var deformedPositions = _dragDeformer.Deform(_mesh);
+        for (var i = 0; i < _mesh.Vertices.Count; i++)
+            _mesh.Vertices[i].Position = deformedPositions[i];
+
+        _dragDeformer.Clear();
+        RefreshDeformedMesh();
+    }
+
+    private Vector2 ScreenToImage(Vector2 screenPoint)
+    {
+        var layout = GetImageLayout();
+        return (screenPoint - layout.Origin) / layout.Scale;
+    }
+
+    private bool IsInsideImage(Vector2 imagePoint)
+    {
+        return
+            imagePoint.X >= 0f &&
+            imagePoint.Y >= 0f &&
+            imagePoint.X <= _imageSize.X &&
+            imagePoint.Y <= _imageSize.Y;
+    }
+
+    private ImageLayout GetImageLayout()
+    {
+        var viewport = _window.FramebufferSize;
+        var imageScale = MathF.Min(viewport.X / _imageSize.X, viewport.Y / _imageSize.Y);
+        var scaledImageSize = _imageSize * imageScale;
+        var imageOrigin = new Vector2(
+            MathF.Round((viewport.X - scaledImageSize.X) * 0.5f),
+            MathF.Round((viewport.Y - scaledImageSize.Y) * 0.5f));
+
+        return new ImageLayout(imageOrigin, imageScale);
     }
 
     private static bool Contains(Vector2 point, Vector2 origin, Vector2 size)
@@ -279,4 +370,6 @@ internal sealed class MeshTestWindow : IDisposable
         _solid?.Dispose();
         _input?.Dispose();
     }
+
+    private readonly record struct ImageLayout(Vector2 Origin, float Scale);
 }

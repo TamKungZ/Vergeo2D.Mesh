@@ -10,10 +10,10 @@ internal sealed class MeshPreviewRenderer : IDisposable
     private readonly uint _texture;
     private readonly uint _vao;
     private readonly uint _vbo;
-    private readonly int _drawVertexCount;
     private readonly int _viewportUniform;
     private readonly int _imageOriginUniform;
     private readonly int _imageScaleUniform;
+    private int _drawVertexCount;
 
     public unsafe MeshPreviewRenderer(GL gl, string imagePath, MeshRenderData2D renderData)
     {
@@ -47,6 +47,8 @@ internal sealed class MeshPreviewRenderer : IDisposable
 
     public void Draw(Vector2D<int> viewport, Vector2 imageOrigin, float imageScale)
     {
+        if (_drawVertexCount == 0) return;
+
         _gl.UseProgram(_shader);
         _gl.Uniform2(_viewportUniform, (float)viewport.X, (float)viewport.Y);
         _gl.Uniform2(_imageOriginUniform, imageOrigin.X, imageOrigin.Y);
@@ -58,6 +60,13 @@ internal sealed class MeshPreviewRenderer : IDisposable
         _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)_drawVertexCount);
     }
 
+    public void Update(MeshRenderData2D renderData)
+    {
+        var vertices = TestMeshFactory.ExpandIndexedTriangles(renderData);
+        _drawVertexCount = vertices.Length / MeshRenderData2D.FloatsPerVertex;
+        UploadVertices(vertices);
+    }
+
     private unsafe void UploadVertices(float[] vertices)
     {
         fixed (float* pointer = vertices)
@@ -66,7 +75,7 @@ internal sealed class MeshPreviewRenderer : IDisposable
                 BufferTargetARB.ArrayBuffer,
                 (nuint)(vertices.Length * sizeof(float)),
                 pointer,
-                BufferUsageARB.StaticDraw);
+                BufferUsageARB.DynamicDraw);
         }
     }
 

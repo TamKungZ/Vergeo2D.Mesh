@@ -44,6 +44,7 @@ public sealed class Direct3D11MeshRenderBackend2D : IMeshRenderBackend2D
         WriteIndexBuffer(resource, data);
 
         resource.IndexCount = data.IndexCount;
+        if (resource.Generation == 0) resource.Generation = 1;
         resource.Alive = true;
         data.ClearDirtyFlags();
 

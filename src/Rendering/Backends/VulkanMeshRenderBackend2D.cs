@@ -50,6 +50,7 @@ public unsafe sealed class VulkanMeshRenderBackend2D : IMeshRenderBackend2D
         UploadIndexBuffer(resource, data);
 
         resource.IndexCount = data.IndexCount;
+        if (resource.Generation == 0) resource.Generation = 1;
         resource.Alive = true;
         data.ClearDirtyFlags();
 

@@ -53,6 +53,7 @@ public sealed class OpenGLMeshRenderBackend2D : IMeshRenderBackend2D
         _resources[index].Vbo = vbo;
         _resources[index].Ebo = ebo;
         _resources[index].IndexCount = data.IndexCount;
+        if (_resources[index].Generation == 0) _resources[index].Generation = 1;
         _resources[index].Alive = true;
         data.ClearDirtyFlags();
 

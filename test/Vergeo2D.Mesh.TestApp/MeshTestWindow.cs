@@ -290,7 +290,7 @@ internal sealed class MeshTestWindow : IDisposable
 
         _mesh = GridMeshGenerator.Generate(_textureInfo, _alphaMask, _generationSettings);
         _dragDeformer.Clear();
-        _dragDeformer.Radius = Math.Max(120f, _generationSettings.Spacing * 3f);
+        _dragDeformer.Radius = Math.Max(160f, _generationSettings.Spacing * 4f);
 
         _renderData.Clear();
         MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);

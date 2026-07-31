@@ -42,6 +42,7 @@ internal sealed class MeshTestWindow : IDisposable
     private bool _showUvOverlay;
     private bool _previewTransparent = true;
     private bool _isDragging;
+    private bool _canDrawPreview;
     private bool _reportedDrawError;
 
     public MeshTestWindow(WindowOptions options, string imagePath, MeshTestBackend backend)
@@ -65,8 +66,10 @@ internal sealed class MeshTestWindow : IDisposable
     {
         if (_backend != MeshTestBackend.OpenGL)
         {
-            MeshBackendSmokeTest.Run(_imagePath, _backend);
-            _window.Close();
+            LoadMeshData();
+            _input = _window.CreateInput();
+            Console.WriteLine($"{MeshBackendSmokeTest.GetBackendLabel(_backend)} test window is running.");
+            Console.WriteLine("Close the window when you are done testing this backend window path.");
             return;
         }
 
@@ -83,22 +86,11 @@ internal sealed class MeshTestWindow : IDisposable
         gl.LineWidth(1f);
         gl.PointSize(8f);
 
-        _input = _window.CreateInput();
-        foreach (var mouse in _input.Mice)
-        {
-            mouse.MouseDown += OnMouseDown;
-            mouse.MouseMove += OnMouseMove;
-            mouse.MouseUp += OnMouseUp;
-        }
+        CreateInputHandlers();
 
-        _textureInfo = Texture2D.LoadFromFile(_imagePath);
-        _alphaMask = ImageAlphaMask.Load(_imagePath);
-        Console.WriteLine($"Loaded {_imagePath}");
-        Console.WriteLine($"Texture: {_textureInfo.Width}x{_textureInfo.Height}");
-
-        _imageSize = new Vector2(_textureInfo.Width, _textureInfo.Height);
         _solid = new Solid2DRenderer(gl);
         GenerateMesh();
+        _canDrawPreview = true;
 
         CheckGl(gl, "create render resources");
         OnResize(_window.FramebufferSize);
@@ -106,6 +98,8 @@ internal sealed class MeshTestWindow : IDisposable
 
     private void OnRender(double deltaSeconds)
     {
+        if (!_canDrawPreview) return;
+
         var gl = _gl!;
         var viewport = _window.FramebufferSize;
         if (viewport.X <= 0 || viewport.Y <= 0) return;
@@ -136,6 +130,38 @@ internal sealed class MeshTestWindow : IDisposable
     private void OnResize(Vector2D<int> size)
     {
         _gl?.Viewport(size);
+    }
+
+    private void LoadMeshData()
+    {
+        _textureInfo = Texture2D.LoadFromFile(_imagePath);
+        _alphaMask = ImageAlphaMask.Load(_imagePath);
+        Console.WriteLine($"Loaded {_imagePath}");
+        Console.WriteLine($"Texture: {_textureInfo.Width}x{_textureInfo.Height}");
+
+        _imageSize = new Vector2(_textureInfo.Width, _textureInfo.Height);
+        _mesh = MeshGridGenerator2D.GenerateConnectedGrid(_textureInfo, _gridOptions, _alphaMask);
+        _overlayMesh = MeshGridGenerator2D.GenerateMaskedContourGrid(_textureInfo, _alphaMask, _gridOptions);
+        _dragDeformer.Clear();
+        _dragDeformer.Radius = Math.Max(120f, _gridOptions.Spacing * 3f);
+
+        _renderData.Clear();
+        MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);
+        _overlayRenderData.Clear();
+        MeshRenderExtractor.Extract(_overlayMesh, deformer: null, _overlayRenderData);
+
+        Console.WriteLine($"Generated shape mesh: {_overlayRenderData.VertexCount} vertices, {_overlayRenderData.IndexCount / 3} faces, spacing {_gridOptions.Spacing}");
+    }
+
+    private void CreateInputHandlers()
+    {
+        _input = _window.CreateInput();
+        foreach (var mouse in _input.Mice)
+        {
+            mouse.MouseDown += OnMouseDown;
+            mouse.MouseMove += OnMouseMove;
+            mouse.MouseUp += OnMouseUp;
+        }
     }
 
     private void OnMouseDown(IMouse mouse, MouseButton button)
@@ -300,19 +326,10 @@ internal sealed class MeshTestWindow : IDisposable
     {
         if (_gl is null || _textureInfo is null || _alphaMask is null) return;
 
-        _mesh = MeshGridGenerator2D.GenerateConnectedGrid(_textureInfo, _gridOptions, _alphaMask);
-        _overlayMesh = MeshGridGenerator2D.GenerateMaskedContourGrid(_textureInfo, _alphaMask, _gridOptions);
-        _dragDeformer.Clear();
-        _dragDeformer.Radius = Math.Max(120f, _gridOptions.Spacing * 3f);
-
-        _renderData.Clear();
-        MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);
-        _overlayRenderData.Clear();
-        MeshRenderExtractor.Extract(_overlayMesh, deformer: null, _overlayRenderData);
+        LoadMeshData();
         _preview?.Dispose();
         _preview = new MeshPreviewRenderer(_gl, _imagePath, _renderData);
         _uvOverlay = new UvOverlayRenderer(_overlayRenderData);
-        Console.WriteLine($"Generated shape mesh: {_overlayRenderData.VertexCount} vertices, {_overlayRenderData.IndexCount / 3} faces, spacing {_gridOptions.Spacing}");
     }
 
     private void BeginImageDrag(Vector2 screenPoint)

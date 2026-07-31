@@ -21,7 +21,6 @@ for (var i = 0; i < args.Length; i++)
         if (value.Equals("all", StringComparison.OrdinalIgnoreCase))
         {
             runAllBackends = true;
-            smokeOnly = true;
             continue;
         }
 
@@ -41,7 +40,6 @@ for (var i = 0; i < args.Length; i++)
         if (value.Equals("all", StringComparison.OrdinalIgnoreCase))
         {
             runAllBackends = true;
-            smokeOnly = true;
             continue;
         }
 
@@ -73,6 +71,12 @@ for (var i = 0; i < args.Length; i++)
 if (!File.Exists(imagePath))
 {
     Console.Error.WriteLine($"Test image not found: {imagePath}");
+    return 1;
+}
+
+if (runAllBackends && !smokeOnly)
+{
+    Console.Error.WriteLine("--backend all is only available with --smoke.");
     return 1;
 }
 

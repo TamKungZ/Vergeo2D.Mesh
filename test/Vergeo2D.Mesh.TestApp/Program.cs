@@ -1,6 +1,3 @@
-using Silk.NET.Maths;
-using Silk.NET.Windowing;
-
 var backend = MeshTestBackend.OpenGL;
 var runAllBackends = false;
 var smokeOnly = false;
@@ -80,13 +77,6 @@ if (runAllBackends && !smokeOnly)
     return 1;
 }
 
-if (!smokeOnly && backend != MeshTestBackend.OpenGL)
-{
-    Console.Error.WriteLine($"{MeshBackendSmokeTest.GetBackendLabel(backend)} interactive rendering is not implemented in this test app yet.");
-    Console.Error.WriteLine("Use --smoke to validate the mesh/render-data pipeline, or run --backend opengl for the interactive preview.");
-    return 1;
-}
-
 if (smokeOnly)
 {
     var backends = runAllBackends
@@ -101,30 +91,9 @@ if (smokeOnly)
     return 0;
 }
 
-var options = CreateWindowOptions(backend);
-options.Title = $"Vergeo2D.Mesh Test Render ({MeshBackendSmokeTest.GetBackendLabel(backend)})";
-options.Size = new Vector2D<int>(1280, 720);
-
-using var app = new MeshTestWindow(options, imagePath);
+using var app = new VeldridPreviewApp(imagePath, backend);
 app.Run();
 return 0;
-
-static WindowOptions CreateWindowOptions(MeshTestBackend backend)
-{
-    var options = backend == MeshTestBackend.Vulkan
-        ? WindowOptions.DefaultVulkan
-        : WindowOptions.Default;
-
-    options.API = backend switch
-    {
-        MeshTestBackend.OpenGL => new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(3, 3)),
-        MeshTestBackend.Vulkan => GraphicsAPI.DefaultVulkan,
-        MeshTestBackend.DirectX => GraphicsAPI.None,
-        _ => options.API
-    };
-
-    return options;
-}
 
 static bool TryParseBackend(string value, out MeshTestBackend backend)
 {

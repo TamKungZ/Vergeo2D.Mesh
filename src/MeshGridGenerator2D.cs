@@ -79,7 +79,7 @@ public static class MeshGridGenerator2D
         {
             for (var x = 0; x < columns; x++)
             {
-                AddMaskedCell(mesh, mask, vertexIndices, points[x, y], points[x + 1, y], points[x + 1, y + 1], points[x, y + 1]);
+                AddRefinedCell(mesh, mask, vertexIndices, points[x, y], points[x + 1, y + 1]);
             }
         }
 

@@ -44,7 +44,7 @@ dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj -- 
 - Loads image dimensions through `Texture2D.LoadFromFile`.
 - Adapts the image alpha channel to `IMeshMask2D`.
 - Generates a triangle mesh from the image alpha silhouette through `MeshGridGenerator2D.GenerateMaskedContourGrid`.
-- Uses `MeshGridGenerator2D.GenerateConnectedGrid` behind the preview so large drags do not tear the texture.
+- Uses the same masked contour surface for the textured preview and UV overlay.
 - Generates UVs from mesh positions.
 - Extracts render buffers with `MeshRenderExtractor`.
 - Uploads the extracted vertices and indices to OpenGL and draws the texture in a window.

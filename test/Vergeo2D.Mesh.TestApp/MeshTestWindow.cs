@@ -129,8 +129,8 @@ internal sealed class MeshTestWindow : IDisposable
         Console.WriteLine($"Texture: {_textureInfo.Width}x{_textureInfo.Height}");
 
         _imageSize = new Vector2(_textureInfo.Width, _textureInfo.Height);
-        _mesh = MeshGridGenerator2D.GenerateConnectedGrid(_textureInfo, _gridOptions, _alphaMask);
-        _overlayMesh = MeshGridGenerator2D.GenerateMaskedContourGrid(_textureInfo, _alphaMask, _gridOptions);
+        _mesh = MeshGridGenerator2D.GenerateMaskedContourGrid(_textureInfo, _alphaMask, _gridOptions);
+        _overlayMesh = _mesh.Clone();
         _dragDeformer.Clear();
         _dragDeformer.Radius = Math.Max(120f, _gridOptions.Spacing * 3f);
 

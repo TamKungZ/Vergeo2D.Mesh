@@ -19,17 +19,7 @@ internal sealed class UvOverlayRenderer
     {
         var sourceVertices = _renderData.Vertices;
         var sourceIndices = _renderData.Indices;
-        var faceVertices = new float[sourceIndices.Length * 2];
-
-        for (var i = 0; i < sourceIndices.Length; i++)
-        {
-            var vertexOffset = sourceIndices[i] * MeshRenderData2D.FloatsPerVertex;
-            var position = new Vector2(sourceVertices[vertexOffset], sourceVertices[vertexOffset + 1]);
-            var screen = ImageToScreen(position, imageOrigin, imageScale);
-            var targetOffset = i * 2;
-            faceVertices[targetOffset] = screen.X;
-            faceVertices[targetOffset + 1] = screen.Y;
-        }
+        var faceVertices = BuildFaceVertices(sourceVertices, sourceIndices, imageOrigin, imageScale);
 
         solid.DrawTriangles(faceVertices, FaceColor);
 
@@ -44,6 +34,27 @@ internal sealed class UvOverlayRenderer
         }
 
         solid.DrawPoints(faceVertices, VertexColor);
+    }
+
+    internal static float[] BuildFaceVertices(
+        ReadOnlySpan<float> sourceVertices,
+        ReadOnlySpan<int> sourceIndices,
+        Vector2 imageOrigin,
+        float imageScale)
+    {
+        var faceVertices = new float[sourceIndices.Length * 2];
+
+        for (var i = 0; i < sourceIndices.Length; i++)
+        {
+            var vertexOffset = sourceIndices[i] * MeshRenderData2D.FloatsPerVertex;
+            var position = new Vector2(sourceVertices[vertexOffset], sourceVertices[vertexOffset + 1]);
+            var screen = ImageToScreen(position, imageOrigin, imageScale);
+            var targetOffset = i * 2;
+            faceVertices[targetOffset] = screen.X;
+            faceVertices[targetOffset + 1] = screen.Y;
+        }
+
+        return faceVertices;
     }
 
     private static Vector2 ImageToScreen(Vector2 position, Vector2 imageOrigin, float imageScale)

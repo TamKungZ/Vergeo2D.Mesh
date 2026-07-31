@@ -1,11 +1,12 @@
 using System.Numerics;
-using Veldrid;
-using Veldrid.Sdl2;
-using Veldrid.StartupUtilities;
+using Silk.NET.Input;
+using Silk.NET.Maths;
+using Silk.NET.OpenGL;
+using Silk.NET.Windowing;
 using Vergeo2D.Mesh;
 using Vergeo2D.Rendering;
 
-internal sealed class VeldridPreviewApp : IDisposable
+internal sealed class MeshTestWindow : IDisposable
 {
     private const int MinimumWidth = 1280;
     private const int MinimumHeight = 720;
@@ -19,19 +20,18 @@ internal sealed class VeldridPreviewApp : IDisposable
     private static readonly Vector2 StepperButtonSize = new(30f, 24f);
     private static readonly Vector2 GenerateButtonSize = new(150f, 28f);
 
+    private readonly IWindow _window;
     private readonly string _imagePath;
-    private readonly MeshTestBackend _backend;
     private readonly MeshRenderData2D _renderData = new();
     private readonly MeshRenderData2D _overlayRenderData = new();
     private readonly MeshGridOptions2D _gridOptions = new();
     private readonly RadialDragDeformer2D _dragDeformer = new();
 
-    private Sdl2Window? _window;
-    private GraphicsDevice? _graphicsDevice;
-    private CommandList? _commandList;
+    private GL? _gl;
     private MeshPreviewRenderer? _preview;
     private Solid2DRenderer? _solid;
     private UvOverlayRenderer? _uvOverlay;
+    private IInputContext? _input;
     private Vector2 _imageSize;
     private Texture2D? _textureInfo;
     private ImageAlphaMask? _alphaMask;
@@ -41,102 +41,125 @@ internal sealed class VeldridPreviewApp : IDisposable
     private bool _showUvOverlay;
     private bool _previewTransparent = true;
     private bool _isDragging;
+    private bool _canDrawPreview;
+    private bool _reportedDrawError;
 
-    public VeldridPreviewApp(string imagePath, MeshTestBackend backend)
+    public MeshTestWindow(WindowOptions options, string imagePath)
     {
         _imagePath = imagePath;
-        _backend = backend;
+        _window = Window.Create(options);
+        _window.Load += OnLoad;
+        _window.Render += OnRender;
+        _window.Resize += OnWindowResize;
+        _window.FramebufferResize += OnResize;
+        _window.Closing += Dispose;
     }
 
     public void Run()
     {
-        var windowInfo = new WindowCreateInfo(
-            100,
-            100,
-            MinimumWidth,
-            MinimumHeight,
-            WindowState.Normal,
-            $"Vergeo2D.Mesh Test Render ({MeshBackendSmokeTest.GetBackendLabel(_backend)})");
-
-        var options = new GraphicsDeviceOptions
-        {
-            PreferStandardClipSpaceYDirection = true,
-            PreferDepthRangeZeroToOne = true,
-            SyncToVerticalBlank = true
-        };
-
-        VeldridStartup.CreateWindowAndGraphicsDevice(
-            windowInfo,
-            options,
-            ToGraphicsBackend(_backend),
-            out _window,
-            out _graphicsDevice);
-
-        Console.WriteLine($"Renderer: {_graphicsDevice.BackendType}");
-
-        _commandList = _graphicsDevice.ResourceFactory.CreateCommandList();
-        _solid = new Solid2DRenderer(_graphicsDevice);
-        GenerateMesh();
-
-        while (_window.Exists)
-        {
-            var snapshot = _window.PumpEvents();
-            if (!_window.Exists) break;
-
-            ResizeIfNeeded();
-            HandleInput(snapshot);
-            DrawFrame();
-        }
+        _window.Run();
     }
 
-    private void DrawFrame()
+    private void OnLoad()
     {
-        var graphicsDevice = _graphicsDevice!;
-        var commandList = _commandList!;
-        var viewport = GetViewport();
+        _gl = GL.GetApi(_window);
+        var gl = _gl;
+
+        gl.ClearColor(0.08f, 0.09f, 0.1f, 1f);
+        gl.Disable(EnableCap.CullFace);
+        gl.Disable(EnableCap.DepthTest);
+        gl.Disable(EnableCap.ScissorTest);
+        gl.Disable(EnableCap.StencilTest);
+        gl.Enable(EnableCap.Blend);
+        gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+        gl.LineWidth(1f);
+        gl.PointSize(8f);
+
+        CreateInputHandlers();
+
+        _solid = new Solid2DRenderer(gl);
+        GenerateMesh();
+        _canDrawPreview = true;
+
+        CheckGl(gl, "create render resources");
+        OnResize(_window.FramebufferSize);
+    }
+
+    private void OnRender(double deltaSeconds)
+    {
+        if (!_canDrawPreview) return;
+
+        var gl = _gl!;
+        var viewport = _window.FramebufferSize;
         if (viewport.X <= 0 || viewport.Y <= 0) return;
 
+        gl.Viewport(viewport);
+        gl.Clear(ClearBufferMask.ColorBufferBit);
+
         var layout = GetImageLayout();
-
-        commandList.Begin();
-        commandList.SetFramebuffer(graphicsDevice.SwapchainFramebuffer);
-        commandList.ClearColorTarget(0, new RgbaFloat(0.08f, 0.09f, 0.1f, 1f));
-
-        var solid = _solid!;
-        solid.Begin(commandList, viewport);
 
         if (_previewTransparent)
             DrawCheckerboard(viewport, layout.Origin, _imageSize * layout.Scale, layout.Scale);
 
-        _preview?.Draw(commandList, viewport, layout.Origin, layout.Scale);
+        _preview?.Draw(viewport, layout.Origin, layout.Scale);
         DrawUi(viewport, layout.Origin, layout.Scale);
 
-        commandList.End();
-        graphicsDevice.SubmitCommands(commandList);
-        graphicsDevice.SwapBuffers();
+        if (!_reportedDrawError)
+            _reportedDrawError = !CheckGl(gl, "draw frame");
     }
 
-    private void HandleInput(InputSnapshot snapshot)
+    private void OnWindowResize(Vector2D<int> size)
     {
-        var mousePosition = snapshot.MousePosition;
-        var mousePoint = new Vector2(mousePosition.X, mousePosition.Y);
+        var width = Math.Max(size.X, MinimumWidth);
+        var height = Math.Max(size.Y, MinimumHeight);
+        if (width != size.X || height != size.Y)
+            _window.Size = new Vector2D<int>(width, height);
+    }
 
-        foreach (var mouseEvent in snapshot.MouseEvents)
+    private void OnResize(Vector2D<int> size)
+    {
+        _gl?.Viewport(size);
+    }
+
+    private void LoadMeshData()
+    {
+        _textureInfo = Texture2D.LoadFromFile(_imagePath);
+        _alphaMask = ImageAlphaMask.Load(_imagePath);
+        Console.WriteLine($"Loaded {_imagePath}");
+        Console.WriteLine($"Texture: {_textureInfo.Width}x{_textureInfo.Height}");
+
+        _imageSize = new Vector2(_textureInfo.Width, _textureInfo.Height);
+        _mesh = MeshGridGenerator2D.GenerateConnectedGrid(_textureInfo, _gridOptions, _alphaMask);
+        _overlayMesh = MeshGridGenerator2D.GenerateMaskedContourGrid(_textureInfo, _alphaMask, _gridOptions);
+        _dragDeformer.Clear();
+        _dragDeformer.Radius = Math.Max(120f, _gridOptions.Spacing * 3f);
+
+        _renderData.Clear();
+        MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);
+        _overlayRenderData.Clear();
+        MeshRenderExtractor.Extract(_overlayMesh, deformer: null, _overlayRenderData);
+
+        Console.WriteLine($"Generated shape mesh: {_overlayRenderData.VertexCount} vertices, {_overlayRenderData.IndexCount / 3} faces, spacing {_gridOptions.Spacing}");
+    }
+
+    private void CreateInputHandlers()
+    {
+        _input = _window.CreateInput();
+        foreach (var mouse in _input.Mice)
         {
-            if (mouseEvent.MouseButton != MouseButton.Left) continue;
-
-            if (mouseEvent.Down)
-                OnMouseDown(mousePoint);
-            else
-                OnMouseUp();
+            mouse.MouseDown += OnMouseDown;
+            mouse.MouseMove += OnMouseMove;
+            mouse.MouseUp += OnMouseUp;
         }
-
-        if (_isDragging)
-            OnMouseMove(mousePoint);
     }
 
-    private void OnMouseDown(Vector2 point)
+    private void OnMouseDown(IMouse mouse, MouseButton button)
     {
+        if (button != MouseButton.Left) return;
+
+        var position = mouse.Position;
+        var point = new Vector2(position.X, position.Y);
+
         if (Contains(point, OverlayCheckboxOrigin, new Vector2(CheckboxSize + 130f, CheckboxSize)))
         {
             _showUvOverlay = !_showUvOverlay;
@@ -152,14 +175,12 @@ internal sealed class VeldridPreviewApp : IDisposable
         if (Contains(point, SpacingMinusOrigin, StepperButtonSize))
         {
             _gridOptions.Spacing = Math.Max(4, _gridOptions.Spacing - 4);
-            GenerateMesh();
             return;
         }
 
         if (Contains(point, SpacingPlusOrigin, StepperButtonSize))
         {
             _gridOptions.Spacing = Math.Min(512, _gridOptions.Spacing + 4);
-            GenerateMesh();
             return;
         }
 
@@ -172,7 +193,7 @@ internal sealed class VeldridPreviewApp : IDisposable
         BeginImageDrag(point);
     }
 
-    private void OnMouseMove(Vector2 position)
+    private void OnMouseMove(IMouse mouse, Vector2 position)
     {
         if (!_isDragging) return;
 
@@ -181,15 +202,18 @@ internal sealed class VeldridPreviewApp : IDisposable
         RefreshDeformedMesh();
     }
 
-    private void OnMouseUp()
+    private void OnMouseUp(IMouse mouse, MouseButton button)
     {
+        if (button != MouseButton.Left) return;
+
         _isDragging = false;
         CommitDragToMesh();
     }
 
-    private void DrawUi(Vector2 viewport, Vector2 imageOrigin, float imageScale)
+    private void DrawUi(Vector2D<int> viewport, Vector2 imageOrigin, float imageScale)
     {
         var solid = _solid!;
+        solid.Begin(viewport);
         DrawPanel(solid, viewport.Y);
         DrawCheckbox(solid, OverlayCheckboxOrigin, _showUvOverlay);
         BitmapTextRenderer.Draw(solid, "UV OVERLAY", OverlayCheckboxOrigin + new Vector2(28f, 2f), 2f, new Vector4(0.9f, 0.92f, 0.94f, 1f));
@@ -213,13 +237,13 @@ internal sealed class VeldridPreviewApp : IDisposable
         _uvOverlay!.Draw(solid, imageOrigin, imageScale);
     }
 
-    private static void DrawPanel(Solid2DRenderer solid, float viewportHeight)
+    private static void DrawPanel(Solid2DRenderer solid, int viewportHeight)
     {
         solid.DrawRect(Vector2.Zero, new Vector2(PanelWidth, viewportHeight), new Vector4(0.07f, 0.08f, 0.09f, 0.92f));
         BitmapTextRenderer.Draw(solid, "TEST MESH", new Vector2(18f, 20f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
     }
 
-    private void DrawCheckerboard(Vector2 viewport, Vector2 origin, Vector2 size, float imageScale)
+    private void DrawCheckerboard(Vector2D<int> viewport, Vector2 origin, Vector2 size, float imageScale)
     {
         var solid = _solid!;
         var squareSize = Math.Max(4f, MathF.Round(16f * imageScale));
@@ -228,6 +252,7 @@ internal sealed class VeldridPreviewApp : IDisposable
         var light = new Vector4(0.78f, 0.78f, 0.78f, 1f);
         var dark = new Vector4(0.64f, 0.64f, 0.64f, 1f);
 
+        solid.Begin(viewport);
         for (var y = 0; y < rows; y++)
         {
             for (var x = 0; x < columns; x++)
@@ -288,27 +313,12 @@ internal sealed class VeldridPreviewApp : IDisposable
 
     private void GenerateMesh()
     {
-        _textureInfo = Texture2D.LoadFromFile(_imagePath);
-        _alphaMask = ImageAlphaMask.Load(_imagePath);
-        _imageSize = new Vector2(_textureInfo.Width, _textureInfo.Height);
+        if (_gl is null) return;
 
-        _mesh = MeshGridGenerator2D.GenerateConnectedGrid(_textureInfo, _gridOptions, _alphaMask);
-        _overlayMesh = MeshGridGenerator2D.GenerateMaskedContourGrid(_textureInfo, _alphaMask, _gridOptions);
-        _dragDeformer.Clear();
-        _dragDeformer.Radius = Math.Max(120f, _gridOptions.Spacing * 3f);
-
-        _renderData.Clear();
-        MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);
-        _overlayRenderData.Clear();
-        MeshRenderExtractor.Extract(_overlayMesh, deformer: null, _overlayRenderData);
-
-        if (_preview is null)
-            _preview = new MeshPreviewRenderer(_graphicsDevice!, _imagePath, _renderData);
-        else
-            _preview.Update(_renderData);
-
+        LoadMeshData();
+        _preview?.Dispose();
+        _preview = new MeshPreviewRenderer(_gl, _imagePath, _renderData);
         _uvOverlay = new UvOverlayRenderer(_overlayRenderData);
-        Console.WriteLine($"Generated shape mesh: {_overlayRenderData.VertexCount} vertices, {_overlayRenderData.IndexCount / 3} faces, spacing {_gridOptions.Spacing}");
     }
 
     private void BeginImageDrag(Vector2 screenPoint)
@@ -361,23 +371,8 @@ internal sealed class VeldridPreviewApp : IDisposable
 
     private MeshViewportLayout2D GetImageLayout()
     {
-        var viewport = GetViewport();
-        return MeshViewportLayout2D.Fit(_imageSize, viewport);
-    }
-
-    private Vector2 GetViewport()
-    {
-        var framebuffer = _graphicsDevice!.SwapchainFramebuffer;
-        return new Vector2(framebuffer.Width, framebuffer.Height);
-    }
-
-    private void ResizeIfNeeded()
-    {
-        var width = Math.Max(1, _window!.Width);
-        var height = Math.Max(1, _window.Height);
-        var framebuffer = _graphicsDevice!.SwapchainFramebuffer;
-        if (framebuffer.Width != width || framebuffer.Height != height)
-            _graphicsDevice.ResizeMainWindow((uint)width, (uint)height);
+        var viewport = _window.FramebufferSize;
+        return MeshViewportLayout2D.Fit(_imageSize, new Vector2(viewport.X, viewport.Y));
     }
 
     private static bool Contains(Vector2 point, Vector2 origin, Vector2 size)
@@ -389,23 +384,23 @@ internal sealed class VeldridPreviewApp : IDisposable
             point.Y <= origin.Y + size.Y;
     }
 
-    private static GraphicsBackend ToGraphicsBackend(MeshTestBackend backend)
+    private static bool CheckGl(GL gl, string stage)
     {
-        return backend switch
+        var error = gl.GetError();
+        if (error != GLEnum.NoError)
         {
-            MeshTestBackend.OpenGL => GraphicsBackend.OpenGL,
-            MeshTestBackend.Vulkan => GraphicsBackend.Vulkan,
-            MeshTestBackend.DirectX => GraphicsBackend.Direct3D11,
-            _ => GraphicsBackend.OpenGL
-        };
+            Console.Error.WriteLine($"OpenGL error after {stage}: {error}");
+            return false;
+        }
+
+        return true;
     }
 
     public void Dispose()
     {
-        _graphicsDevice?.WaitForIdle();
         _preview?.Dispose();
         _solid?.Dispose();
-        _commandList?.Dispose();
-        _graphicsDevice?.Dispose();
+        _input?.Dispose();
     }
+
 }

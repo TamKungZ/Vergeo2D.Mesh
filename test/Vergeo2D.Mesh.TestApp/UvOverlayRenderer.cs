@@ -1,4 +1,5 @@
 using System.Numerics;
+using Silk.NET.Maths;
 using Vergeo2D.Rendering;
 
 internal sealed class UvOverlayRenderer

@@ -22,7 +22,6 @@ internal sealed class MeshTestWindow : IDisposable
 
     private readonly IWindow _window;
     private readonly string _imagePath;
-    private readonly MeshTestBackend _backend;
     private readonly MeshRenderData2D _renderData = new();
     private readonly MeshRenderData2D _overlayRenderData = new();
     private readonly MeshGridOptions2D _gridOptions = new();
@@ -45,10 +44,9 @@ internal sealed class MeshTestWindow : IDisposable
     private bool _canDrawPreview;
     private bool _reportedDrawError;
 
-    public MeshTestWindow(WindowOptions options, string imagePath, MeshTestBackend backend)
+    public MeshTestWindow(WindowOptions options, string imagePath)
     {
         _imagePath = imagePath;
-        _backend = backend;
         _window = Window.Create(options);
         _window.Load += OnLoad;
         _window.Render += OnRender;
@@ -64,15 +62,6 @@ internal sealed class MeshTestWindow : IDisposable
 
     private void OnLoad()
     {
-        if (_backend != MeshTestBackend.OpenGL)
-        {
-            LoadMeshData();
-            _input = _window.CreateInput();
-            Console.WriteLine($"{MeshBackendSmokeTest.GetBackendLabel(_backend)} test window is running.");
-            Console.WriteLine("Close the window when you are done testing this backend window path.");
-            return;
-        }
-
         _gl = GL.GetApi(_window);
         var gl = _gl;
 
@@ -324,7 +313,7 @@ internal sealed class MeshTestWindow : IDisposable
 
     private void GenerateMesh()
     {
-        if (_gl is null || _textureInfo is null || _alphaMask is null) return;
+        if (_gl is null) return;
 
         LoadMeshData();
         _preview?.Dispose();

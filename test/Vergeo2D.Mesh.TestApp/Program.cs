@@ -80,6 +80,13 @@ if (runAllBackends && !smokeOnly)
     return 1;
 }
 
+if (!smokeOnly && backend != MeshTestBackend.OpenGL)
+{
+    Console.Error.WriteLine($"{MeshBackendSmokeTest.GetBackendLabel(backend)} interactive rendering is not implemented in this test app yet.");
+    Console.Error.WriteLine("Use --smoke to validate the mesh/render-data pipeline, or run --backend opengl for the interactive preview.");
+    return 1;
+}
+
 if (smokeOnly)
 {
     var backends = runAllBackends
@@ -98,7 +105,7 @@ var options = CreateWindowOptions(backend);
 options.Title = $"Vergeo2D.Mesh Test Render ({MeshBackendSmokeTest.GetBackendLabel(backend)})";
 options.Size = new Vector2D<int>(1280, 720);
 
-using var app = new MeshTestWindow(options, imagePath, backend);
+using var app = new MeshTestWindow(options, imagePath);
 app.Run();
 return 0;
 

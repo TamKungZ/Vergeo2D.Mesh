@@ -1,6 +1,6 @@
 # Vergeo2D.Mesh Test App
 
-Small test app for wiring `Vergeo2D.Mesh` into real backend windows. OpenGL runs the interactive textured preview, while Vulkan and Direct3D11 open their backend window paths and load the same mesh/render-data pipeline.
+Small test app for wiring `Vergeo2D.Mesh` into a real preview window. OpenGL runs the interactive textured preview, while Vulkan and Direct3D11 are available as explicit mesh/render-data smoke tests until dedicated interactive renderers are added.
 
 ## Preview
 
@@ -14,12 +14,10 @@ Small test app for wiring `Vergeo2D.Mesh` into real backend windows. OpenGL runs
 dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj
 ```
 
-Choose a backend with `--backend`:
+Run the interactive preview:
 
 ```bash
 dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj -- --backend opengl
-dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj -- --backend vulkan
-dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj -- --backend dx
 ```
 
 Run smoke tests explicitly with `--smoke`:
@@ -50,6 +48,5 @@ dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj -- 
 - Generates UVs from mesh positions.
 - Extracts render buffers with `MeshRenderExtractor`.
 - Uploads the extracted vertices and indices to OpenGL and draws the texture in a window.
-- Opens Vulkan/Direct3D11 backend windows and keeps the app running until the window is closed.
-- Runs backend smoke tests only when `--smoke` is passed.
+- Runs Vulkan/Direct3D11 smoke tests only when `--smoke` is passed.
 - Uses `RadialDragDeformer2D` and `Mesh2D.ApplyDeformer` to stretch and commit the generated mesh with mouse drag input.

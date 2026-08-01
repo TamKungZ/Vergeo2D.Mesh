@@ -80,6 +80,7 @@ public sealed class Direct3D11MeshRenderBackend2D : IMeshRenderBackend2D
     public void Draw(RenderResourceHandle handle, in RenderTransform2D transform)
     {
         ref var resource = ref Get(handle);
+        if (resource.IndexCount == 0) return;
 
         var stride = MeshRenderData2D.FloatsPerVertex * sizeof(float);
         _context.IASetVertexBuffers(0, new[] { resource.VertexBuffer }, new[] { stride }, new[] { 0 });
@@ -110,26 +111,29 @@ public sealed class Direct3D11MeshRenderBackend2D : IMeshRenderBackend2D
 
     private void CreateOrGrowBuffer(ref ID3D11Buffer? buffer, ref int capacityBytes, int requiredBytes, BindFlags bindFlags)
     {
-        if (buffer is not null && requiredBytes <= capacityBytes) return;
+        var bufferBytes = Math.Max(requiredBytes, 1);
+        if (buffer is not null && bufferBytes <= capacityBytes) return;
 
         buffer?.Dispose();
 
         var description = new BufferDescription
         {
-            ByteWidth = requiredBytes,
+            ByteWidth = bufferBytes,
             Usage = ResourceUsage.Dynamic,
             BindFlags = bindFlags,
             CPUAccessFlags = CpuAccessFlags.Write
         };
 
         buffer = _device.CreateBuffer(description);
-        capacityBytes = requiredBytes;
+        capacityBytes = bufferBytes;
     }
 
     private unsafe void WriteVertexBuffer(Resource resource, MeshRenderData2D data)
     {
-        var mapped = _context.Map(resource.VertexBuffer, MapMode.WriteDiscard);
         var byteLength = data.VertexCount * MeshRenderData2D.FloatsPerVertex * sizeof(float);
+        if (byteLength == 0) return;
+
+        var mapped = _context.Map(resource.VertexBuffer, MapMode.WriteDiscard);
         fixed (float* source = data.Vertices)
         {
             System.Buffer.MemoryCopy(source, (void*)mapped.DataPointer, byteLength, byteLength);
@@ -139,8 +143,10 @@ public sealed class Direct3D11MeshRenderBackend2D : IMeshRenderBackend2D
 
     private unsafe void WriteIndexBuffer(Resource resource, MeshRenderData2D data)
     {
-        var mapped = _context.Map(resource.IndexBuffer, MapMode.WriteDiscard);
         var byteLength = data.IndexCount * sizeof(int);
+        if (byteLength == 0) return;
+
+        var mapped = _context.Map(resource.IndexBuffer, MapMode.WriteDiscard);
         fixed (int* source = data.Indices)
         {
             System.Buffer.MemoryCopy(source, (void*)mapped.DataPointer, byteLength, byteLength);

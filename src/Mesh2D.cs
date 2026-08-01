@@ -54,6 +54,8 @@ public sealed class Mesh2D
 
     public void RemoveVertex(int index)
     {
+        ValidateVertexIndex(index, nameof(index));
+
         Vertices.RemoveAt(index);
         for (var i = index; i < Vertices.Count; i++) Vertices[i].Index = i;
 
@@ -84,6 +86,8 @@ public sealed class Mesh2D
 
     public void RemoveFace(int faceIndex)
     {
+        ValidateFaceIndex(faceIndex, nameof(faceIndex));
+
         Faces.RemoveAt(faceIndex);
         RebuildEdges();
         TouchGeometry();
@@ -147,6 +151,12 @@ public sealed class Mesh2D
     {
         if ((uint)index >= (uint)Vertices.Count)
             throw new ArgumentOutOfRangeException(parameterName, index, "Vertex index is outside the mesh vertex range.");
+    }
+
+    private void ValidateFaceIndex(int index, string parameterName)
+    {
+        if ((uint)index >= (uint)Faces.Count)
+            throw new ArgumentOutOfRangeException(parameterName, index, "Face index is outside the mesh face range.");
     }
 
     public (Vector2 Min, Vector2 Max) GetBounds()

@@ -89,6 +89,7 @@ public sealed class OpenGLMeshRenderBackend2D : IMeshRenderBackend2D
     public unsafe void Draw(RenderResourceHandle handle, in RenderTransform2D transform)
     {
         ref var resource = ref Get(handle);
+        if (resource.IndexCount == 0) return;
 
         if (resource.TextureId != 0)
         {

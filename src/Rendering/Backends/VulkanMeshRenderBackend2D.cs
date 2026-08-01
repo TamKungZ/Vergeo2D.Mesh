@@ -86,6 +86,7 @@ public unsafe sealed class VulkanMeshRenderBackend2D : IMeshRenderBackend2D
     public void Draw(RenderResourceHandle handle, in RenderTransform2D transform)
     {
         ref var resource = ref Get(handle);
+        if (resource.IndexCount == 0) return;
 
         var vertexBuffer = resource.VertexBuffer;
         ulong offset = 0;
@@ -120,7 +121,8 @@ public unsafe sealed class VulkanMeshRenderBackend2D : IMeshRenderBackend2D
 
     private void CreateOrGrowBuffer(ref Silk.NET.Vulkan.Buffer buffer, ref DeviceMemory memory, ref ulong capacityBytes, ulong requiredBytes, BufferUsageFlags usage)
     {
-        if (requiredBytes <= capacityBytes && buffer.Handle != default) return;
+        var bufferBytes = Math.Max(requiredBytes, 1UL);
+        if (bufferBytes <= capacityBytes && buffer.Handle != default) return;
 
         if (buffer.Handle != default)
         {
@@ -131,7 +133,7 @@ public unsafe sealed class VulkanMeshRenderBackend2D : IMeshRenderBackend2D
         var bufferInfo = new BufferCreateInfo
         {
             SType = StructureType.BufferCreateInfo,
-            Size = requiredBytes,
+            Size = bufferBytes,
             Usage = usage,
             SharingMode = SharingMode.Exclusive
         };
@@ -152,12 +154,14 @@ public unsafe sealed class VulkanMeshRenderBackend2D : IMeshRenderBackend2D
             throw new InvalidOperationException("Failed to allocate Vulkan buffer memory.");
 
         _vk.BindBufferMemory(_device, buffer, memory, 0);
-        capacityBytes = requiredBytes;
+        capacityBytes = bufferBytes;
     }
 
     private void UploadVertexBuffer(Resource resource, MeshRenderData2D data)
     {
         var byteLength = data.VertexCount * MeshRenderData2D.FloatsPerVertex * sizeof(float);
+        if (byteLength == 0) return;
+
         void* mapped;
         _vk.MapMemory(_device, resource.VertexMemory, 0, (ulong)byteLength, 0, &mapped);
         fixed (float* source = data.Vertices)
@@ -170,6 +174,8 @@ public unsafe sealed class VulkanMeshRenderBackend2D : IMeshRenderBackend2D
     private void UploadIndexBuffer(Resource resource, MeshRenderData2D data)
     {
         var byteLength = data.IndexCount * sizeof(int);
+        if (byteLength == 0) return;
+
         void* mapped;
         _vk.MapMemory(_device, resource.IndexMemory, 0, (ulong)byteLength, 0, &mapped);
         fixed (int* source = data.Indices)

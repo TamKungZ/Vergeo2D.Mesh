@@ -28,6 +28,8 @@ public sealed class VertexOffsetDeformer2D : IMeshDeformer2D
 
     public Vector2[] Deform(Mesh2D mesh)
     {
+        if (mesh is null) throw new ArgumentNullException(nameof(mesh));
+
         var result = new Vector2[mesh.Vertices.Count];
         DeformInto(mesh, result);
         return result;
@@ -35,6 +37,10 @@ public sealed class VertexOffsetDeformer2D : IMeshDeformer2D
 
     public void DeformInto(Mesh2D mesh, Span<Vector2> destination)
     {
+        if (mesh is null) throw new ArgumentNullException(nameof(mesh));
+        if (destination.Length < mesh.Vertices.Count)
+            throw new ArgumentException("Destination span is smaller than the mesh vertex count.", nameof(destination));
+
         var vertices = mesh.Vertices;
         for (var i = 0; i < vertices.Count; i++)
         {
@@ -43,4 +49,3 @@ public sealed class VertexOffsetDeformer2D : IMeshDeformer2D
         }
     }
 }
-

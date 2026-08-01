@@ -206,4 +206,9 @@ public sealed class Mesh2D
             ArrayPool<Vector2>.Shared.Return(pooled);
         }
     }
+
+    public MeshValidationResult2D Validate(MeshValidationOptions2D? options = null)
+    {
+        return MeshValidator2D.Validate(this, options);
+    }
 }

@@ -4,11 +4,12 @@
 
 [![NuGet](https://img.shields.io/nuget/v/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)
 [![Downloads](https://img.shields.io/nuget/dt/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)
+[![Docs](https://img.shields.io/badge/docs-dev.tamkungz.me-0ea5e9)](https://dev.tamkungz.me/documentation/vergeo2d/)
 ![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4)
 ![.NET Standard](https://img.shields.io/badge/.NET%20Standard-2.0%20%7C%202.1-512BD4)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-A lightweight C# library for editing 2D texture meshes — vertices, edges, faces and UV mapping — built as a foundation for 2D rigging tools.
+A lightweight C# library for editing 2D texture meshes - vertices, edges, faces and UV mapping - built as a foundation for 2D rigging tools.
 
 > This library was originally created for my own projects, but if you find it useful, feel free to use it in yours as well.
 
@@ -20,7 +21,7 @@ A lightweight C# library for editing 2D texture meshes — vertices, edges, face
 
 ## Install
 
-```
+```bash
 dotnet add package Vergeo2D.Mesh
 ```
 
@@ -67,6 +68,13 @@ var clone = mesh.Clone();
 
 var json = Mesh2DSerializer.ToJson(mesh);
 var loaded = Mesh2DSerializer.FromJson(json);
+Mesh2DSerializer.SaveToFile(mesh, "character.mesh.json");
+
+var strictLoaded = Mesh2DSerializer.LoadFromFile("character.mesh.json", new Mesh2DSerializationOptions
+{
+    TextureBaseDirectory = "assets",
+    ThrowOnTextureLoadFailure = true
+});
 ```
 
 ```csharp
@@ -90,14 +98,39 @@ drag.SetDrag(origin, offset);
 grid.ApplyDeformer(drag);
 ```
 
+```csharp
+// Editor helpers for validating generated/imported meshes and picking handles.
+var validation = mesh.Validate();
+if (!validation.IsValid)
+{
+    foreach (var issue in validation.Issues)
+        Console.WriteLine(issue);
+}
+
+if (MeshPicking2D.FindNearestVertex(mesh, mousePosition, 12f, out var vertexIndex, out _))
+{
+    mesh.Vertices[vertexIndex].Position += dragOffset;
+}
+
+if (MeshPicking2D.FindNearestEdge(mesh, mousePosition, 8f, out var edge, out var closest, out _))
+{
+    // edge and closest point can be used for insert/selection tools.
+}
+
+// Build a mask from alpha bytes decoded by your app/UI layer.
+var alphaMask = MeshMask2D.FromAlphaMap(alphaBytes, width, height, threshold: 8);
+```
+
 ## Features
 
-- Vertex / edge / face mesh structure — add, remove, clone, adjacency queries, point-in-face hit testing
-- Dependency-free PNG / JPEG / BMP / GIF dimension reader with pixel ↔ UV conversion
+- Vertex / edge / face mesh structure - add, remove, clone, adjacency queries, point-in-face hit testing
+- Dependency-free PNG / JPEG / BMP / GIF dimension reader with pixel to UV conversion
 - Textured quad and grid mesh generators for common sprite/deformation setup
-- Mask-driven contour mesh generation through `IMeshMask2D` / predicate adapters
-- JSON serialization, including the linked texture path
-- `IMeshDeformer2D` extension point for custom deformation logic — ships with `VertexOffsetDeformer2D` and `RadialDragDeformer2D` reference implementations
+- Mask-driven contour mesh generation through `IMeshMask2D`, predicate adapters, and alpha byte maps
+- JSON serialization with optional texture loading behavior and base-directory resolution
+- Mesh validation diagnostics for editor/import pipelines
+- Picking helpers for nearest vertex, nearest edge, barycentric coordinates, and face UV lookup
+- `IMeshDeformer2D` extension point for custom deformation logic - ships with `VertexOffsetDeformer2D` and `RadialDragDeformer2D` reference implementations
 - Handle-based mesh manager for tracking large numbers of live meshes with generation-checked handles, dirty-only re-extraction, and texture batching
 - A pluggable rendering abstraction (`IMeshRenderBackend2D`) with optional OpenGL, Direct3D11, and Vulkan backends
 
@@ -105,9 +138,9 @@ grid.ApplyDeformer(drag);
 
 `Vergeo2D.Management` provides a pooled way to own many meshes at once without hunting for lifetime bugs yourself.
 
-- **`MeshHandle`** — a lightweight, generation-checked reference to a mesh slot. A handle from a removed/replaced slot is automatically detected as invalid instead of silently pointing at the wrong mesh.
-- **`MeshManager2D`** — add/remove meshes and their optional `IMeshDeformer2D`, then call `PrepareFrame()` once per frame. Only meshes whose `Mesh2D.Version` changed (or that are marked dirty via `MarkDirty`) get re-extracted into render data; `parallel: true` extracts dirty slots with `Parallel.For` once the pool is large.
-- **`MeshBatch2D`** — the result of `GetBatches()`, which groups all currently alive handles by their shared `Texture2D` so you can issue one draw call per texture instead of one per mesh.
+- **`MeshHandle`** - a lightweight, generation-checked reference to a mesh slot. A handle from a removed/replaced slot is automatically detected as invalid instead of silently pointing at the wrong mesh.
+- **`MeshManager2D`** - add/remove meshes and their optional `IMeshDeformer2D`, then call `PrepareFrame()` once per frame. Only meshes whose `Mesh2D.Version` changed (or that are marked dirty via `MarkDirty`) get re-extracted into render data; `parallel: true` extracts dirty slots with `Parallel.For` once the pool is large.
+- **`MeshBatch2D`** - the result of `GetBatches()`, which groups all currently alive handles by their shared `Texture2D` so you can issue one draw call per texture instead of one per mesh.
 
 ```csharp
 using Vergeo2D.Management;
@@ -133,7 +166,7 @@ manager.Remove(handle); // handle becomes invalid immediately, generation is bum
 
 ## Rendering
 
-`Vergeo2D.Rendering` turns a `Mesh2D` into GPU-ready buffers and defines the contract a render backend implements — the core library stays engine-agnostic.
+`Vergeo2D.Rendering` turns a `Mesh2D` into GPU-ready buffers and defines the contract a render backend implements - the core library stays engine-agnostic.
 
 | Type | Description |
 |---|---|
@@ -145,13 +178,13 @@ manager.Remove(handle); // handle becomes invalid immediately, generation is bum
 | `RenderTransform2D` | Position + rotation (radians) + scale, convertible to a `Matrix3x2` |
 | `RenderResourceHandle` | Generation-checked handle returned by a backend for a GPU-side resource |
 
-`MeshManager2D` calls `MeshRenderExtractor` internally, so most consumers only interact with this layer through the manager — use it directly if you're managing a single mesh outside of `MeshManager2D`.
+`MeshManager2D` calls `MeshRenderExtractor` internally, so most consumers only interact with this layer through the manager - use it directly if you're managing a single mesh outside of `MeshManager2D`.
 
 The extracted `MeshRenderData2D` buffers are plain interleaved floats (`x, y, u, v`) plus triangle indices, so you can also upload them into your own renderer. Veldrid works well for this path: create a vertex buffer from `renderData.Vertices`, an index buffer from `renderData.Indices`, and refresh only the buffers whose dirty flags changed.
 
 ## Render Backends
 
-Three reference `IMeshRenderBackend2D` implementations ship under `Vergeo2D.Rendering.Backends`. **Unlike the core mesh library, these are not dependency-free** — each is guarded behind a compilation symbol and requires its own third-party package, so nothing extra is pulled in unless you opt in.
+Three reference `IMeshRenderBackend2D` implementations ship under `Vergeo2D.Rendering.Backends`. **Unlike the core mesh library, these are not dependency-free** - each is guarded behind a compilation symbol and requires its own third-party package, so nothing extra is pulled in unless you opt in.
 
 These backend classes are optional references, not the only supported route. If your application already uses Veldrid or another renderer, you can keep `Vergeo2D.Mesh` as the mesh/deformation layer and map `MeshRenderData2D` into that renderer's own resource pipeline.
 
@@ -173,7 +206,7 @@ Add the relevant `PackageReference` and `DefineConstants` to your project to ena
 </ItemGroup>
 ```
 
-Without the matching define constant, the backend class simply isn't compiled in — the core library (`Mesh2D`, `Texture2D`, `Mesh2DSerializer`, management types) has zero third-party dependencies either way.
+Without the matching define constant, the backend class simply isn't compiled in - the core library (`Mesh2D`, `Texture2D`, `Mesh2DSerializer`, management types) has zero third-party dependencies either way.
 
 ## API
 
@@ -182,11 +215,13 @@ Without the matching define constant, the backend class simply isn't compiled in
 | `Vertex2D` | Position + UV |
 | `Edge2D` | Undirected pair of vertex indices |
 | `Face2D` | Triangle of three vertex indices |
-| `Mesh2D` | Vertex/edge/face collection with editing and query methods; exposes a `Version` counter (bumped via `TouchGeometry()`) used for dirty tracking; can commit an `IMeshDeformer2D` via `ApplyDeformer()` |
+| `Mesh2D` | Vertex/edge/face collection with editing and query methods; exposes a `Version` counter (bumped via `TouchGeometry()`) used for dirty tracking; can commit an `IMeshDeformer2D` via `ApplyDeformer()`; can run validation via `Validate()` |
 | `Texture2D` | Image dimensions plus pixel/UV conversion |
 | `MeshPrimitives2D`, `MeshGridGenerator2D`, `MeshGridOptions2D`, `IMeshMask2D`, `MeshMask2D` | Common textured quad, connected grid, and mask contour generation helpers |
 | `IMeshDeformer2D`, `VertexOffsetDeformer2D`, `RadialDragDeformer2D` | Optional deformation extension point and built-in reference deformers |
-| `Mesh2DSerializer` | JSON import/export |
+| `MeshValidator2D`, `MeshValidationOptions2D`, `MeshValidationResult2D`, `MeshValidationIssue2D` | Mesh diagnostics for invalid faces, small triangles, duplicate faces, orphan vertices, non-manifold edges, and inconsistent winding |
+| `MeshPicking2D` | Editor helpers for nearest vertex/edge picking, barycentric coordinates, and face UV interpolation |
+| `Mesh2DSerializer`, `Mesh2DSerializationOptions` | JSON import/export with configurable texture loading |
 | `MeshHandle`, `MeshManager2D`, `MeshBatch2D` | Pooled mesh ownership, dirty-only extraction, texture batching |
 | `MeshRenderExtractor`, `MeshRenderData2D`, `MeshRenderData2DExtensions`, `MeshViewportLayout2D`, `IMeshRenderBackend2D`, `RenderTransform2D`, `RenderResourceHandle` | Backend-agnostic rendering pipeline |
 | `OpenGLMeshRenderBackend2D`, `Direct3D11MeshRenderBackend2D`, `VulkanMeshRenderBackend2D` | Optional backend implementations (see [Render Backends](#render-backends)) |
@@ -197,4 +232,4 @@ Issues and PRs are welcome at [github.com/TamKungZ/Vergeo2D.Mesh](https://github
 
 ## License
 
-GPLv3 © 2026 [TamKungZ_](mailto:dev@tamkungz.me)
+GPLv3 (c) 2026 [TamKungZ_](mailto:dev@tamkungz.me)

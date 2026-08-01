@@ -23,6 +23,17 @@ A lightweight C# library for editing 2D texture meshes — vertices, edges, face
 dotnet add package Vergeo2D.Mesh
 ```
 
+## Framework Support
+
+`Vergeo2D.Mesh` targets both `net8.0` and `netstandard2.1`.
+
+| Target | Use when |
+|---|---|
+| `net8.0` | You are building a modern .NET 8+ app or tool |
+| `netstandard2.1` | You need to consume the mesh core from .NET Core 3.x, .NET 5+, or other runtimes that support .NET Standard 2.1 |
+
+.NET Framework 4.x is not supported directly. The core library is dependency-light, but the `netstandard2.1` target uses `System.Text.Json` as a package dependency for mesh serialization.
+
 ## Usage
 
 ```csharp

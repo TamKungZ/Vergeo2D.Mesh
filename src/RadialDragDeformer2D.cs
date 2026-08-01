@@ -51,7 +51,7 @@ public sealed class RadialDragDeformer2D : IMeshDeformer2D
         {
             var position = vertices[i].Position;
             var distance = Vector2.Distance(position, _origin);
-            var amount = SmoothFalloff(Math.Clamp(distance / radius, 0f, 1f));
+            var amount = SmoothFalloff(Clamp(distance / radius, 0f, 1f));
             destination[i] = position + _offset * amount;
         }
     }
@@ -61,5 +61,11 @@ public sealed class RadialDragDeformer2D : IMeshDeformer2D
         var inverse = 1f - normalizedDistance;
         return inverse * inverse * (3f - 2f * inverse);
     }
-}
 
+    private static float Clamp(float value, float min, float max)
+    {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
+}

@@ -35,11 +35,12 @@ public static class Mesh2DSerializer
 
         foreach (var face in data.Faces) mesh.AddFace(face.A, face.B, face.C);
 
-        if (!string.IsNullOrEmpty(data.TexturePath))
+        var texturePath = data.TexturePath;
+        if (texturePath != null && texturePath.Length > 0)
         {
             try
             {
-                mesh.SetTexture(Texture2D.LoadFromFile(data.TexturePath));
+                mesh.SetTexture(Texture2D.LoadFromFile(texturePath));
             }
             catch (IOException)
             {
@@ -74,4 +75,3 @@ public static class Mesh2DSerializer
         public int C { get; set; }
     }
 }
-

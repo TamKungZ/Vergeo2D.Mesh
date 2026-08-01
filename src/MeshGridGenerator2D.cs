@@ -100,7 +100,7 @@ public static class MeshGridGenerator2D
 
     private static int GetSpacing(MeshGridOptions2D? options)
     {
-        return Math.Clamp(options?.Spacing ?? DefaultSpacing, 4, 512);
+        return Clamp(options?.Spacing ?? DefaultSpacing, 4, 512);
     }
 
     private static Vector2[,] BuildGridPoints(Texture2D texture, int spacing, int columns, int rows)
@@ -211,7 +211,7 @@ public static class MeshGridGenerator2D
         Vector2 bottomRight)
     {
         var size = bottomRight - topLeft;
-        var subdivisions = Math.Clamp((int)MathF.Ceiling(MathF.Max(size.X, size.Y) / 16f), 2, BoundarySubdivisions);
+        var subdivisions = Clamp((int)MathF.Ceiling(MathF.Max(size.X, size.Y) / 16f), 2, BoundarySubdivisions);
 
         for (var y = 0; y < subdivisions; y++)
         {
@@ -521,6 +521,13 @@ public static class MeshGridGenerator2D
     private static float Cross(Vector2 a, Vector2 b) => a.X * b.Y - a.Y * b.X;
 
     private static float Lerp(float a, float b, float amount) => a + (b - a) * amount;
+
+    private static int Clamp(int value, int min, int max)
+    {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
 
     private enum CellCoverage
     {

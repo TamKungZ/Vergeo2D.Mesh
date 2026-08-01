@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;netstandard2.1</TargetFrameworks>
+    <TargetFrameworks>net8.0;netstandard2.1;netstandard2.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
@@ -9,13 +9,13 @@
 
   <PropertyGroup>
     <PackageId>Vergeo2D.Mesh</PackageId>
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <Authors>TamKungZ_</Authors>
     <Product>Vergeo2D.Mesh</Product>
     <Description>2D mesh library with vertex, edge and face structures, texture/UV binding, and an optional deformer extension point, for editing textured 2D meshes as a base for 2D rigging tools.</Description>
     <Copyright>Copyright © 2026 TamKungZ_</Copyright>
     <PackageTags>2d;mesh;texture;uv;vertex;edge;face;rig;mesh-editor;deformer</PackageTags>
-    <PackageReleaseNotes>Add netstandard2.1 support, improve API validation, and harden optional render backends when handling empty mesh buffers.</PackageReleaseNotes>
+    <PackageReleaseNotes>Add netstandard2.0 compatibility target while keeping modern net8.0 and netstandard2.1 implementations as the primary code path.</PackageReleaseNotes>
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://dev.tamkungz.me/documentation/vergeo2d/</PackageProjectUrl>
@@ -26,6 +26,15 @@
 
   <ItemGroup>
     <Compile Remove="test/**/*.cs" />
+    <Compile Remove="src/Compatibility/NetStandard20/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <Compile Remove="src/IMeshDeformer2D.cs" />
+    <Compile Include="src/Compatibility/NetStandard20/**/*.cs" />
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.1'">

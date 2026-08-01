@@ -5,6 +5,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)
 [![Downloads](https://img.shields.io/nuget/dt/Vergeo2D.Mesh.svg)](https://www.nuget.org/packages/Vergeo2D.Mesh)
 ![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4)
+![.NET Standard](https://img.shields.io/badge/.NET%20Standard-2.0%20%7C%202.1-512BD4)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 A lightweight C# library for editing 2D texture meshes — vertices, edges, faces and UV mapping — built as a foundation for 2D rigging tools.
@@ -25,14 +26,19 @@ dotnet add package Vergeo2D.Mesh
 
 ## Framework Support
 
-`Vergeo2D.Mesh` targets both `net8.0` and `netstandard2.1`.
+`Vergeo2D.Mesh` targets `net8.0`, `netstandard2.1`, and `netstandard2.0`.
 
 | Target | Use when |
 |---|---|
 | `net8.0` | You are building a modern .NET 8+ app or tool |
 | `netstandard2.1` | You need to consume the mesh core from .NET Core 3.x, .NET 5+, or other runtimes that support .NET Standard 2.1 |
+| `netstandard2.0` | You need compatibility with older hosts, including legacy .NET Standard 2.0 consumers |
 
-.NET Framework 4.x is not supported directly. The core library is dependency-light, but the `netstandard2.1` target uses `System.Text.Json` as a package dependency for mesh serialization.
+The `net8.0` target is the primary modern path. The `netstandard2.0` target is provided for compatibility and includes small internal fallbacks for APIs that older runtimes do not provide. For .NET Framework consumers, .NET Framework 4.7.2+ is recommended when consuming the `netstandard2.0` asset.
+
+The core library is dependency-light. `netstandard2.0` uses `System.Memory`, `System.Numerics.Vectors`, and `System.Text.Json` package dependencies; `netstandard2.1` uses `System.Text.Json` for mesh serialization.
+
+When implementing a custom `IMeshDeformer2D`, implement both `Deform()` and `DeformInto()` if you need source compatibility with `netstandard2.0`. Modern targets provide the default `DeformInto()` implementation on the interface.
 
 ## Usage
 

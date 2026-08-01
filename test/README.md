@@ -6,7 +6,7 @@ This folder contains runnable test and smoke-test projects for `Vergeo2D.Mesh`.
 
 | Project | Description |
 |---|---|
-| `Vergeo2D.Mesh.TestApp` | OpenGL window app that loads `assets/character-base.png`, adapts its alpha channel to `IMeshMask2D`, generates connected/contour meshes through `Vergeo2D.Mesh`, extracts render data, and draws it. |
+| `Vergeo2D.Mesh.TestApp` | OpenGL window app that loads `assets/character-base.png`, adapts its alpha channel to `IMeshMask2D`, generates connected/contour meshes through `Vergeo2D.Mesh`, validates the mesh, previews picking helpers, extracts render data, and draws it. |
 
 ## Run
 

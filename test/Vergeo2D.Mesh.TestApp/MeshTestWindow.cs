@@ -38,9 +38,18 @@ internal sealed class MeshTestWindow : IDisposable
     private Mesh2D? _mesh;
     private Mesh2D? _overlayMesh;
     private Vector2 _dragOriginImage;
+    private Vector2 _hoverUv;
+    private Vector2 _hoverEdgePoint;
+    private Edge2D _hoverEdge;
+    private int _hoverVertexIndex = -1;
+    private int _hoverFaceIndex = -1;
+    private int _validationErrorCount;
+    private int _validationWarningCount;
     private bool _showUvOverlay;
     private bool _previewTransparent = true;
     private bool _isDragging;
+    private bool _hasHoverUv;
+    private bool _hasHoverEdge;
     private bool _canDrawPreview;
     private bool _reportedDrawError;
 
@@ -102,6 +111,7 @@ internal sealed class MeshTestWindow : IDisposable
             DrawCheckerboard(viewport, layout.Origin, _imageSize * layout.Scale, layout.Scale);
 
         _preview?.Draw(viewport, layout.Origin, layout.Scale);
+        DrawPickingOverlay(viewport, layout.Origin, layout.Scale);
         DrawUi(viewport, layout.Origin, layout.Scale);
 
         if (!_reportedDrawError)
@@ -133,6 +143,8 @@ internal sealed class MeshTestWindow : IDisposable
         _overlayMesh = _mesh.Clone();
         _dragDeformer.Clear();
         _dragDeformer.Radius = Math.Max(120f, _gridOptions.Spacing * 3f);
+        ValidateMesh();
+        ClearHover();
 
         _renderData.Clear();
         MeshRenderExtractor.Extract(_mesh, deformer: null, _renderData);
@@ -195,6 +207,8 @@ internal sealed class MeshTestWindow : IDisposable
 
     private void OnMouseMove(IMouse mouse, Vector2 position)
     {
+        UpdateHover(position);
+
         if (!_isDragging) return;
 
         var imagePoint = ScreenToImage(position);
@@ -230,6 +244,7 @@ internal sealed class MeshTestWindow : IDisposable
 
         BitmapTextRenderer.Draw(solid, $"VERTICES: {_overlayRenderData.VertexCount}", new Vector2(18f, 326f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
         BitmapTextRenderer.Draw(solid, $"FACES: {_overlayRenderData.IndexCount / 3}", new Vector2(18f, 350f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
+        DrawStatusText(solid);
 
         if (!_showUvOverlay) return;
 
@@ -241,6 +256,56 @@ internal sealed class MeshTestWindow : IDisposable
     {
         solid.DrawRect(Vector2.Zero, new Vector2(PanelWidth, viewportHeight), new Vector4(0.07f, 0.08f, 0.09f, 0.92f));
         BitmapTextRenderer.Draw(solid, "TEST MESH", new Vector2(18f, 20f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
+    }
+
+    private void DrawStatusText(Solid2DRenderer solid)
+    {
+        var validationColor = _validationErrorCount > 0
+            ? new Vector4(1f, 0.32f, 0.28f, 1f)
+            : _validationWarningCount > 0
+                ? new Vector4(1f, 0.82f, 0.25f, 1f)
+                : new Vector4(0.36f, 0.95f, 0.55f, 1f);
+
+        var validationText = _validationErrorCount > 0
+            ? $"VALID: ERR {_validationErrorCount}"
+            : _validationWarningCount > 0
+                ? $"VALID: WARN {_validationWarningCount}"
+                : "VALID: OK";
+
+        BitmapTextRenderer.Draw(solid, validationText, new Vector2(18f, 386f), 2f, validationColor);
+        BitmapTextRenderer.Draw(solid, $"HOVER V: {FormatIndex(_hoverVertexIndex)}", new Vector2(18f, 422f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
+        BitmapTextRenderer.Draw(solid, $"HOVER F: {FormatIndex(_hoverFaceIndex)}", new Vector2(18f, 446f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
+
+        if (_hasHoverUv)
+            BitmapTextRenderer.Draw(solid, $"UV: {_hoverUv.X:0.000}, {_hoverUv.Y:0.000}", new Vector2(18f, 470f), 2f, new Vector4(0.72f, 0.78f, 0.84f, 1f));
+        else
+            BitmapTextRenderer.Draw(solid, "UV: --", new Vector2(18f, 470f), 2f, new Vector4(0.45f, 0.50f, 0.55f, 1f));
+    }
+
+    private void DrawPickingOverlay(Vector2D<int> viewport, Vector2 imageOrigin, float imageScale)
+    {
+        if (_overlayMesh is null || _solid is null) return;
+
+        var solid = _solid;
+        solid.Begin(viewport);
+
+        if (_hasHoverEdge &&
+            (uint)_hoverEdge.A < (uint)_overlayMesh.Vertices.Count &&
+            (uint)_hoverEdge.B < (uint)_overlayMesh.Vertices.Count)
+        {
+            var a = ImageToScreen(_overlayMesh.Vertices[_hoverEdge.A].Position, imageOrigin, imageScale);
+            var b = ImageToScreen(_overlayMesh.Vertices[_hoverEdge.B].Position, imageOrigin, imageScale);
+            var closest = ImageToScreen(_hoverEdgePoint, imageOrigin, imageScale);
+
+            solid.DrawLines(new[] { a.X, a.Y, b.X, b.Y }, new Vector4(1f, 0.9f, 0.1f, 1f));
+            solid.DrawPoints(new[] { closest.X, closest.Y }, new Vector4(1f, 0.9f, 0.1f, 1f));
+        }
+
+        if ((uint)_hoverVertexIndex < (uint)_overlayMesh.Vertices.Count)
+        {
+            var vertex = ImageToScreen(_overlayMesh.Vertices[_hoverVertexIndex].Position, imageOrigin, imageScale);
+            solid.DrawPoints(new[] { vertex.X, vertex.Y }, new Vector4(0.1f, 1f, 0.55f, 1f));
+        }
     }
 
     private void DrawCheckerboard(Vector2D<int> viewport, Vector2 origin, Vector2 size, float imageScale)
@@ -321,6 +386,65 @@ internal sealed class MeshTestWindow : IDisposable
         _uvOverlay = new UvOverlayRenderer(_overlayRenderData);
     }
 
+    private void ValidateMesh()
+    {
+        if (_mesh is null) return;
+
+        var result = _mesh.Validate();
+        _validationErrorCount = 0;
+        _validationWarningCount = 0;
+
+        foreach (var issue in result.Issues)
+        {
+            if (issue.Severity == MeshValidationSeverity2D.Error)
+                _validationErrorCount++;
+            else
+                _validationWarningCount++;
+
+            Console.WriteLine(issue);
+        }
+
+        Console.WriteLine($"Validation: {_validationErrorCount} errors, {_validationWarningCount} warnings");
+    }
+
+    private void UpdateHover(Vector2 screenPoint)
+    {
+        if (_overlayMesh is null || screenPoint.X < PanelWidth)
+        {
+            ClearHover();
+            return;
+        }
+
+        var imagePoint = ScreenToImage(screenPoint);
+        if (!IsInsideImage(imagePoint))
+        {
+            ClearHover();
+            return;
+        }
+
+        _hoverFaceIndex = _overlayMesh.FindFaceAt(imagePoint);
+        _hasHoverUv = _hoverFaceIndex >= 0 && MeshPicking2D.TryGetFaceUV(_overlayMesh, _hoverFaceIndex, imagePoint, out _hoverUv);
+
+        var scale = Math.Max(0.0001f, GetImageLayout().Scale);
+        var vertexRadius = Math.Max(8f, 12f / scale);
+        if (!MeshPicking2D.FindNearestVertex(_overlayMesh, imagePoint, vertexRadius, out _hoverVertexIndex, out _))
+            _hoverVertexIndex = -1;
+
+        var edgeRadius = Math.Max(4f, 8f / scale);
+        _hasHoverEdge = MeshPicking2D.FindNearestEdge(_overlayMesh, imagePoint, edgeRadius, out _hoverEdge, out _hoverEdgePoint, out _);
+    }
+
+    private void ClearHover()
+    {
+        _hoverUv = Vector2.Zero;
+        _hoverEdgePoint = Vector2.Zero;
+        _hoverEdge = default;
+        _hoverVertexIndex = -1;
+        _hoverFaceIndex = -1;
+        _hasHoverUv = false;
+        _hasHoverEdge = false;
+    }
+
     private void BeginImageDrag(Vector2 screenPoint)
     {
         if (_mesh is null || _overlayMesh is null || _alphaMask is null || screenPoint.X < PanelWidth) return;
@@ -356,6 +480,8 @@ internal sealed class MeshTestWindow : IDisposable
 
         _dragDeformer.Clear();
         RefreshDeformedMesh();
+        ValidateMesh();
+        ClearHover();
     }
 
     private Vector2 ScreenToImage(Vector2 screenPoint)
@@ -382,6 +508,16 @@ internal sealed class MeshTestWindow : IDisposable
             point.X <= origin.X + size.X &&
             point.Y >= origin.Y &&
             point.Y <= origin.Y + size.Y;
+    }
+
+    private static Vector2 ImageToScreen(Vector2 position, Vector2 imageOrigin, float imageScale)
+    {
+        return imageOrigin + position * imageScale;
+    }
+
+    private static string FormatIndex(int index)
+    {
+        return index >= 0 ? index.ToString() : "--";
     }
 
     private static bool CheckGl(GL gl, string stage)

@@ -43,9 +43,14 @@ dotnet run --project test/Vergeo2D.Mesh.TestApp/Vergeo2D.Mesh.TestApp.csproj -- 
 
 - Loads image dimensions through `Texture2D.LoadFromFile`.
 - Adapts the image alpha channel to `IMeshMask2D`.
+- Adapts decoded alpha bytes through `MeshMask2D.FromAlphaMap` in smoke tests.
 - Generates a triangle mesh from the image alpha silhouette through `MeshGridGenerator2D.GenerateMaskedContourGrid`.
+- Validates generated meshes through `Mesh2D.Validate`.
 - Uses the same masked contour surface for the textured preview and UV overlay.
+- Highlights nearest vertices and edges through `MeshPicking2D`.
+- Shows interpolated hover UVs through `MeshPicking2D.TryGetFaceUV`.
 - Generates UVs from mesh positions.
+- Round-trips mesh JSON through `Mesh2DSerializer`.
 - Extracts render buffers with `MeshRenderExtractor`.
 - Uploads the extracted vertices and indices to OpenGL and draws the texture in a window.
 - Runs Vulkan/Direct3D11 smoke tests only when `--smoke` is passed.

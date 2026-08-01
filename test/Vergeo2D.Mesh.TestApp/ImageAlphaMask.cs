@@ -35,5 +35,12 @@ internal sealed class ImageAlphaMask : IMeshMask2D
         return _alpha[iy * Width + ix] > threshold;
     }
 
+    public byte[] ToAlphaArray()
+    {
+        var copy = new byte[_alpha.Length];
+        Array.Copy(_alpha, copy, _alpha.Length);
+        return copy;
+    }
+
     public bool Contains(Vector2 point) => IsOpaqueAt(point.X, point.Y);
 }

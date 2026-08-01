@@ -10,9 +10,15 @@ internal static class MeshBackendSmokeTest
         var alphaMask = ImageAlphaMask.Load(imagePath);
         var gridOptions = new MeshGridOptions2D();
         var mesh = MeshGridGenerator2D.GenerateMaskedContourGrid(texture, alphaMask, gridOptions);
+        var alphaMapMask = MeshMask2D.FromAlphaMap(alphaMask.ToAlphaArray(), alphaMask.Width, alphaMask.Height, threshold: 9);
+        var alphaMapMesh = MeshGridGenerator2D.GenerateMaskedContourGrid(texture, alphaMapMask, gridOptions);
         var overlayMesh = mesh.Clone();
         var renderData = new MeshRenderData2D();
         var overlayRenderData = new MeshRenderData2D();
+
+        EnsureValidMesh(mesh, "Generated contour mesh");
+        EnsureValidMesh(alphaMapMesh, "Alpha-map contour mesh");
+        EnsureSerializerRoundTrip(mesh);
 
         MeshRenderExtractor.Extract(mesh, deformer: null, renderData);
         MeshRenderExtractor.Extract(overlayMesh, deformer: null, overlayRenderData);
@@ -52,6 +58,9 @@ internal static class MeshBackendSmokeTest
         if (overlayRenderData.VertexCount == 0 || overlayRenderData.IndexCount == 0)
             throw new InvalidOperationException("Backend smoke test generated empty overlay render data.");
 
+        if (alphaMapMesh.Vertices.Count == 0 || alphaMapMesh.Faces.Count == 0)
+            throw new InvalidOperationException("Alpha-map mask generated an empty contour mesh.");
+
         if (originalOverlayVertices.AsSpan().SequenceEqual(deformedOverlayVertices))
             throw new InvalidOperationException("Overlay geometry did not move with the deformed texture preview.");
 
@@ -71,6 +80,7 @@ internal static class MeshBackendSmokeTest
         Console.WriteLine($"Texture: {texture.Width}x{texture.Height}");
         Console.WriteLine($"Preview mesh: {renderData.VertexCount} vertices, {renderData.IndexCount / 3} faces");
         Console.WriteLine($"Overlay mesh: {overlayRenderData.VertexCount} vertices, {overlayRenderData.IndexCount / 3} faces");
+        Console.WriteLine($"Alpha-map mesh: {alphaMapMesh.Vertices.Count} vertices, {alphaMapMesh.Faces.Count} faces");
     }
 
     public static string GetBackendLabel(MeshTestBackend backend)
@@ -97,6 +107,44 @@ internal static class MeshBackendSmokeTest
         }
 
         return true;
+    }
+
+    private static void EnsureValidMesh(Mesh2D mesh, string label)
+    {
+        var validation = mesh.Validate();
+        if (validation.HasErrors)
+        {
+            var firstError = validation.Issues.First(issue => issue.Severity == MeshValidationSeverity2D.Error);
+            throw new InvalidOperationException($"{label} failed validation: {firstError}");
+        }
+    }
+
+    private static void EnsureSerializerRoundTrip(Mesh2D mesh)
+    {
+        var json = Mesh2DSerializer.ToJson(mesh);
+        var loaded = Mesh2DSerializer.FromJson(json, new Mesh2DSerializationOptions { LoadTexture = false });
+
+        if (loaded.Texture is not null)
+            throw new InvalidOperationException("Serializer round-trip loaded a texture even though LoadTexture was false.");
+
+        if (loaded.Vertices.Count != mesh.Vertices.Count || loaded.Faces.Count != mesh.Faces.Count)
+            throw new InvalidOperationException("Serializer round-trip changed vertex or face count.");
+
+        for (var i = 0; i < mesh.Vertices.Count; i++)
+        {
+            if (loaded.Vertices[i].Position != mesh.Vertices[i].Position || loaded.Vertices[i].UV != mesh.Vertices[i].UV)
+                throw new InvalidOperationException("Serializer round-trip changed vertex position or UV data.");
+        }
+
+        for (var i = 0; i < mesh.Faces.Count; i++)
+        {
+            if (loaded.Faces[i].A != mesh.Faces[i].A ||
+                loaded.Faces[i].B != mesh.Faces[i].B ||
+                loaded.Faces[i].C != mesh.Faces[i].C)
+            {
+                throw new InvalidOperationException("Serializer round-trip changed face indices.");
+            }
+        }
     }
 
     private static bool SameMeshSurface(MeshRenderData2D preview, MeshRenderData2D overlay)

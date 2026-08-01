@@ -130,9 +130,13 @@ manager.Remove(handle); // handle becomes invalid immediately, generation is bum
 
 `MeshManager2D` calls `MeshRenderExtractor` internally, so most consumers only interact with this layer through the manager — use it directly if you're managing a single mesh outside of `MeshManager2D`.
 
+The extracted `MeshRenderData2D` buffers are plain interleaved floats (`x, y, u, v`) plus triangle indices, so you can also upload them into your own renderer. Veldrid works well for this path: create a vertex buffer from `renderData.Vertices`, an index buffer from `renderData.Indices`, and refresh only the buffers whose dirty flags changed.
+
 ## Render Backends
 
 Three reference `IMeshRenderBackend2D` implementations ship under `Vergeo2D.Rendering.Backends`. **Unlike the core mesh library, these are not dependency-free** — each is guarded behind a compilation symbol and requires its own third-party package, so nothing extra is pulled in unless you opt in.
+
+These backend classes are optional references, not the only supported route. If your application already uses Veldrid or another renderer, you can keep `Vergeo2D.Mesh` as the mesh/deformation layer and map `MeshRenderData2D` into that renderer's own resource pipeline.
 
 | Backend | Requires (NuGet) | Define constant |
 |---|---|---|
